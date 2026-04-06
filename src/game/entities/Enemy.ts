@@ -30,6 +30,12 @@ export abstract class Enemy extends GameObject implements IDamageable {
   private wobbleSpeed: number;
   protected knockbackVelocity: Vector2D = Vector2D.zero();
 
+  // Skull checkpoint system (bosses only)
+  protected skullThresholds: number[] = [0.66, 0.33]; // fractions of maxHealth
+  protected skullsTriggered: number = 0;
+  protected bossInvincibilityTimer: number = 0;
+  protected isPerformingSignature: boolean = false;
+
   constructor(
     x: number,
     y: number,
@@ -58,8 +64,26 @@ export abstract class Enemy extends GameObject implements IDamageable {
   // ----- IDamageable implementation -----
 
   takeDamage(amount: number): void {
+    // Boss invincibility during skull phase
+    if (this.bossInvincibilityTimer > 0) return;
+
     this.health -= amount;
     this.hitFlashTimer = 0.1; // flash white for 100ms
+
+    // Skull threshold check (bosses only)
+    if (this.getIsBoss()) {
+      while (
+        this.skullsTriggered < this.skullThresholds.length &&
+        this.health <= this.maxHealth * this.skullThresholds[this.skullsTriggered] &&
+        this.health > 0
+      ) {
+        this.skullsTriggered++;
+        this.bossInvincibilityTimer = 3.0; // 3 seconds invincible
+        this.isPerformingSignature = true;
+        this.performSignatureMove();
+      }
+    }
+
     if (this.health <= 0) {
       this.health = 0;
       this.destroy();
@@ -88,6 +112,34 @@ export abstract class Enemy extends GameObject implements IDamageable {
     return this.scoreValue;
   }
 
+  /** EXP dropped on death — defaults to scoreValue, bosses override */
+  getExpValue(): number {
+    return this.scoreValue;
+  }
+
+  /** Whether this enemy is a boss — override in boss subclasses */
+  getIsBoss(): boolean {
+    return false;
+  }
+
+  /** Boss signature move — override in boss subclasses */
+  protected performSignatureMove(): void {
+    // No-op for non-bosses
+  }
+
+  /** Whether the boss is currently invincible (skull phase) */
+  isBossInvincible(): boolean {
+    return this.bossInvincibilityTimer > 0;
+  }
+
+  getSkullsTriggered(): number {
+    return this.skullsTriggered;
+  }
+
+  getTotalSkulls(): number {
+    return this.skullThresholds.length;
+  }
+
   // ----- Game Logic -----
 
   /** Called each frame to update the target player position */
@@ -114,6 +166,15 @@ export abstract class Enemy extends GameObject implements IDamageable {
     // Update hit flash
     if (this.hitFlashTimer > 0) {
       this.hitFlashTimer -= deltaTime;
+    }
+
+    // Boss invincibility tick
+    if (this.bossInvincibilityTimer > 0) {
+      this.bossInvincibilityTimer -= deltaTime;
+      if (this.bossInvincibilityTimer <= 0) {
+        this.bossInvincibilityTimer = 0;
+        this.isPerformingSignature = false;
+      }
     }
   }
 
@@ -198,6 +259,28 @@ export abstract class Enemy extends GameObject implements IDamageable {
                           healthPercent > 0.25 ? '#ffaa00' : '#ff3333';
       ctx.fillStyle = healthColor;
       ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+
+      // Skull markers on boss health bars
+      if (this.getIsBoss()) {
+        for (let i = 0; i < this.skullThresholds.length; i++) {
+          const threshold = this.skullThresholds[i];
+          const markerX = barX + barWidth * threshold;
+          const triggered = i < this.skullsTriggered;
+          ctx.fillStyle = triggered ? '#555' : '#ffffff';
+          ctx.font = '8px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('💀', markerX, barY - 1);
+        }
+
+        // Invincibility flash glow
+        if (this.bossInvincibilityTimer > 0) {
+          ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + Math.sin(Date.now() * 0.01) * 0.3})`;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(x, y + wobble, this.size + 6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
     }
   }
 

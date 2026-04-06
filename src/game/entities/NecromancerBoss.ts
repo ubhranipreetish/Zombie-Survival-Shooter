@@ -24,7 +24,7 @@ export class NecromancerBoss extends Enemy {
     super(
       x, y,
       28,
-      400 * healthMultiplier,
+      600 * healthMultiplier,
       40,
       20,
       100,
@@ -44,6 +44,24 @@ export class NecromancerBoss extends Enemy {
   getType(): ZombieType { return ZombieType.BOSS_NECROMANCER; }
   getIsBoss(): boolean { return this.isBoss; }
 
+  takeDamage(amount: number): void {
+    super.takeDamage(amount);
+    if (this.health <= 0) {
+      EventBus.getInstance().emit(GameEvent.BOSS_DEFEATED, { type: ZombieType.BOSS_NECROMANCER });
+    }
+  }
+
+  // Signature move: mass summon 6 minions in a circle
+  protected performSignatureMove(): void {
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      EventBus.getInstance().emit(GameEvent.SPAWN_MINION, {
+        x: this.position.x + Math.cos(angle) * 80,
+        y: this.position.y + Math.sin(angle) * 80,
+      });
+    }
+  }
+
   update(deltaTime: number): void {
     super.update(deltaTime);
     this.orbPhase += deltaTime * 2;
@@ -62,7 +80,7 @@ export class NecromancerBoss extends Enemy {
     this.summonTimer += deltaTime;
     if (this.summonTimer >= this.summonCooldown) {
       this.summonTimer = 0;
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < 3; i++) {
         EventBus.getInstance().emit(GameEvent.SPAWN_MINION, {
           x: this.position.x + (Math.random() - 0.5) * 60,
           y: this.position.y + (Math.random() - 0.5) * 60,

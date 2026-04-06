@@ -11,6 +11,26 @@ import {
 import { randomElement } from '../utils/MathUtils';
 
 /**
+ * Maximum number of times a stackable power-up card can be picked.
+ */
+const MAX_STACK = 5;
+
+/**
+ * Effect types that do NOT count toward the stack cap
+ * (consumables, one-time unlocks, ammo refills).
+ */
+const NON_STACKABLE: Set<CardEffectType> = new Set([
+  CardEffectType.HEAL,
+  CardEffectType.AMMO_REFILL,
+  CardEffectType.FLAMETHROWER_UNLOCK,
+  CardEffectType.FLAMETHROWER_AMMO,
+  CardEffectType.LASER_RIFLE_UNLOCK,
+  CardEffectType.LASER_RIFLE_AMMO,
+  CardEffectType.CROSSBOW_UNLOCK,
+  CardEffectType.CROSSBOW_AMMO,
+]);
+
+/**
  * The full card pool — all available power-up cards.
  * Organized by rarity tier for weighted random selection.
  */
@@ -19,7 +39,7 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'heal_small',
     name: 'First Aid',
-    description: 'Restore 30 HP',
+    description: 'Restore 30 HP instantly. +10% more HP gained after each wave.',
     rarity: CardRarity.COMMON,
     effectType: CardEffectType.HEAL,
     value: 30,
@@ -28,7 +48,7 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'ammo_refill',
     name: 'Ammo Crate',
-    description: 'Refill all weapon ammo',
+    description: 'Refill Shotgun to 30 and Rifle to 90 rounds. +10% more ammo gained after each wave.',
     rarity: CardRarity.COMMON,
     effectType: CardEffectType.AMMO_REFILL,
     value: 1,
@@ -57,7 +77,7 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'damage_boost',
     name: 'Hollow Points',
-    description: '+20% weapon damage',
+    description: '+20% damage for all weapons',
     rarity: CardRarity.UNCOMMON,
     effectType: CardEffectType.DAMAGE_BOOST,
     value: 0.20,
@@ -66,7 +86,7 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'fire_rate_boost',
     name: 'Quick Hands',
-    description: '+25% fire rate',
+    description: '+25% fire rate for all weapons',
     rarity: CardRarity.UNCOMMON,
     effectType: CardEffectType.FIRE_RATE_BOOST,
     value: 0.25,
@@ -86,7 +106,7 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'lifesteal',
     name: 'Vampiric Touch',
-    description: '+5% lifesteal per stack. Heals on damage dealt.',
+    description: '+1 HP per kill. Stacks per level',
     rarity: CardRarity.RARE,
     effectType: CardEffectType.LIFESTEAL,
     value: 0.05,
@@ -153,11 +173,85 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'orbital_drones',
     name: 'Orbital Strike',
-    description: '+1 orbiting drone per stack. Damages enemies on contact.',
+    description: 'Starts with 3 orbiting drones, +1 per stack. Damages enemies on contact.',
     rarity: CardRarity.LEGENDARY,
     effectType: CardEffectType.ORBITAL_DRONES,
     value: 1,
     icon: '🛸',
+  },
+  {
+    id: 'flamethrower_unlock',
+    name: 'Dragon\'s Breath',
+    description: 'Unlocks the Flamethrower (Weapon 4) and grants 120 fuel.',
+    rarity: CardRarity.EPIC,
+    effectType: CardEffectType.FLAMETHROWER_UNLOCK,
+    value: 1,
+    icon: '🔥',
+  },
+  {
+    id: 'flamethrower_ammo',
+    name: 'Napalm Fuel',
+    description: '+150 Flamethrower fuel.',
+    rarity: CardRarity.UNCOMMON,
+    effectType: CardEffectType.FLAMETHROWER_AMMO,
+    value: 150,
+    icon: '🛢️',
+  },
+  {
+    id: 'critical_hit',
+    name: 'Critical Strike',
+    description: '+15% chance to deal 3x damage per stack.',
+    rarity: CardRarity.RARE,
+    effectType: CardEffectType.CRITICAL_HIT,
+    value: 0.15,
+    icon: '🎯',
+  },
+  {
+    id: 'magnet_pull',
+    name: 'Magnetic Coil',
+    description: 'Auto-collects drops instantly within 200px per stack.',
+    rarity: CardRarity.UNCOMMON,
+    effectType: CardEffectType.MAGNET_PULL,
+    value: 200,
+    icon: '🧲',
+  },
+
+  // ===== NEW WEAPON UNLOCKS =====
+  {
+    id: 'laser_rifle_unlock',
+    name: 'Photon Core',
+    description: 'Unlocks the Laser Rifle (Weapon 5) and grants 100 energy.',
+    rarity: CardRarity.EPIC,
+    effectType: CardEffectType.LASER_RIFLE_UNLOCK,
+    value: 1,
+    icon: '⚡',
+  },
+  {
+    id: 'laser_rifle_ammo',
+    name: 'Energy Cell',
+    description: '+100 Laser Rifle energy.',
+    rarity: CardRarity.UNCOMMON,
+    effectType: CardEffectType.LASER_RIFLE_AMMO,
+    value: 100,
+    icon: '🔋',
+  },
+  {
+    id: 'crossbow_unlock',
+    name: 'Ancient Crossbow',
+    description: 'Unlocks the Crossbow (Weapon 6) and grants 20 bolts.',
+    rarity: CardRarity.LEGENDARY,
+    effectType: CardEffectType.CROSSBOW_UNLOCK,
+    value: 1,
+    icon: '🏹',
+  },
+  {
+    id: 'crossbow_ammo',
+    name: 'Quiver of Bolts',
+    description: '+15 Crossbow bolts.',
+    rarity: CardRarity.UNCOMMON,
+    effectType: CardEffectType.CROSSBOW_AMMO,
+    value: 15,
+    icon: '🎯',
   },
 ];
 
@@ -262,7 +356,8 @@ export class CardSystem {
       const minIdx = rarityOrder.indexOf(minRarity);
       const eligibleRarities = rarityOrder.slice(minIdx);
       const guaranteedPool = CARD_POOL.filter(
-        (c) => eligibleRarities.includes(c.rarity) && !usedInThisSelection.has(c.id),
+        (c) => eligibleRarities.includes(c.rarity) && !usedInThisSelection.has(c.id) &&
+               !this.isFilteredOut(c),
       );
       if (guaranteedPool.length > 0) {
         const card = randomElement(guaranteedPool);
@@ -276,11 +371,13 @@ export class CardSystem {
     while (choices.length < 3) {
       const rarity = pickRarity(wave);
       const pool = CARD_POOL.filter(
-        (c) => c.rarity === rarity && !usedInThisSelection.has(c.id),
+        (c) => c.rarity === rarity && !usedInThisSelection.has(c.id) &&
+               !this.isFilteredOut(c),
       );
 
       if (pool.length === 0) {
-        const fallback = CARD_POOL.filter((c) => !usedInThisSelection.has(c.id));
+        const fallback = CARD_POOL.filter((c) => !usedInThisSelection.has(c.id) &&
+                                          !this.isFilteredOut(c));
         if (fallback.length === 0) break;
         const card = randomElement(fallback);
         choices.push(card);
@@ -338,6 +435,25 @@ export class CardSystem {
    */
   getEffectCount(effectType: CardEffectType): number {
     return this.collectedCards.filter((c) => c.effectType === effectType).length;
+  }
+
+  /**
+   * Check if a card should be filtered out of the pool.
+   * - Ammo cards for weapons not yet unlocked
+   * - Stackable cards that hit the MAX_STACK cap
+   */
+  private isFilteredOut(card: PowerUpCard): boolean {
+    // Hide ammo cards for weapons not unlocked yet
+    if (card.id === 'flamethrower_ammo' && !this.hasEffect(CardEffectType.FLAMETHROWER_UNLOCK)) return true;
+    if (card.id === 'laser_rifle_ammo' && !this.hasEffect(CardEffectType.LASER_RIFLE_UNLOCK)) return true;
+    if (card.id === 'crossbow_ammo' && !this.hasEffect(CardEffectType.CROSSBOW_UNLOCK)) return true;
+    // Hide unlock cards already owned (one-time)
+    if (card.id === 'flamethrower_unlock' && this.hasEffect(CardEffectType.FLAMETHROWER_UNLOCK)) return true;
+    if (card.id === 'laser_rifle_unlock' && this.hasEffect(CardEffectType.LASER_RIFLE_UNLOCK)) return true;
+    if (card.id === 'crossbow_unlock' && this.hasEffect(CardEffectType.CROSSBOW_UNLOCK)) return true;
+    // Stack cap for stackable effects
+    if (!NON_STACKABLE.has(card.effectType) && this.getEffectCount(card.effectType) >= MAX_STACK) return true;
+    return false;
   }
 
   /**

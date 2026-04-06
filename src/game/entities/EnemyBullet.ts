@@ -15,18 +15,22 @@ export class EnemyBullet extends GameObject {
   private speed: number;
   private damage: number;
   private lifetime: number;
+  private isSlam: boolean;
 
   constructor(
     x: number, y: number,
     dirX: number, dirY: number,
     speed: number,
     damage: number,
+    radius: number = 4,
+    isSlam: boolean = false
   ) {
-    super(x, y, 4);
+    super(x, y, radius);
     this.direction = new Vector2D(dirX, dirY).normalize();
     this.speed = speed;
     this.damage = damage;
     this.lifetime = 0;
+    this.isSlam = isSlam;
   }
 
   getDamage(): number {
@@ -34,6 +38,12 @@ export class EnemyBullet extends GameObject {
   }
 
   update(deltaTime: number): void {
+    if (this.isSlam) {
+        this.lifetime += deltaTime;
+        if (this.lifetime > 0.3) this.destroy();
+        return;
+    }
+
     const moveAmount = this.direction.scale(this.speed * deltaTime);
     this.position = this.position.add(moveAmount);
     this.lifetime += deltaTime;
@@ -41,6 +51,8 @@ export class EnemyBullet extends GameObject {
   }
 
   render(ctx: CanvasRenderingContext2D): void {
+    if (this.isSlam) return; // Slams are rendered separately by the boss itself
+
     const x = this.position.x;
     const y = this.position.y;
 

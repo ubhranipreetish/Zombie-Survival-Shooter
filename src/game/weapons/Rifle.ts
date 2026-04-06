@@ -12,8 +12,8 @@ import { Vector2D } from '../utils/Vector2D';
  */
 export class Rifle implements IWeaponStrategy {
   readonly name = 'Rifle';
-  readonly fireRate = 10.4;     // 1.3x faster (was 8)
-  readonly damage = 18;          // +0.2x buff
+  readonly fireRate = 13;     // 1.3x faster (was 8)
+  readonly damage = 20;          // +0.2x buff
   readonly maxAmmo = 90;
   readonly color = '#ce93d8';
 
@@ -29,7 +29,7 @@ export class Rifle implements IWeaponStrategy {
       dirY: aimDir.y,
       speed: 800,
       damage: this.damage,
-      size: 2,
+      size: 3,
       color: '#ce93d8',
     }];
   }

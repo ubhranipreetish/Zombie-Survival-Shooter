@@ -59,18 +59,32 @@ export class WaveManager {
       totalZombies: 6 + wave * 3,
       zombieTypes: types,
       spawnInterval: Math.max(200, 900 - wave * 60),
-      healthMultiplier: 1 + (wave - 1) * 0.2,
+      healthMultiplier: 1 + (wave - 1) * 0.10, // Reduced from 0.20 down to 0.10
       speedMultiplier: 1 + (wave - 1) * 0.08,
     };
   }
 
   private getBossType(wave: number): ZombieType {
-    const bossIndex = Math.floor(wave / 5) % 3;
+    const bossIndex = Math.floor(wave / 5) % 5;
     switch (bossIndex) {
       case 0: return ZombieType.BOSS_NECROMANCER;
       case 1: return ZombieType.BOSS_JUGGERNAUT;
       case 2: return ZombieType.BOSS_HYDRA;
+      case 3: return ZombieType.BOSS_PHANTOM;
+      case 4: return ZombieType.BOSS_WARDEN;
       default: return ZombieType.BOSS_NECROMANCER;
+    }
+  }
+
+  /** Returns the troop type that spawns alongside this boss */
+  private getBossTroopType(bossType: ZombieType): ZombieType {
+    switch (bossType) {
+      case ZombieType.BOSS_NECROMANCER: return ZombieType.BOSS_TROOP_UNDEAD;
+      case ZombieType.BOSS_JUGGERNAUT: return ZombieType.BOSS_TROOP_BERSERKER;
+      case ZombieType.BOSS_HYDRA: return ZombieType.BOSS_TROOP_SPITTER;
+      case ZombieType.BOSS_PHANTOM: return ZombieType.BOSS_TROOP_UNDEAD;
+      case ZombieType.BOSS_WARDEN: return ZombieType.BOSS_TROOP_BERSERKER;
+      default: return ZombieType.BOSS_TROOP_UNDEAD;
     }
   }
 
@@ -120,7 +134,7 @@ export class WaveManager {
       newEnemies.push(boss);
     }
 
-    // Spawn regular zombies
+    // Spawn zombies — boss troops on boss waves, regular otherwise
     this.spawnTimer += deltaTime * 1000;
     if (
       this.spawnTimer >= this.waveConfig.spawnInterval &&
@@ -129,9 +143,17 @@ export class WaveManager {
       this.spawnTimer = 0;
 
       const pos = randomEdgePosition(this.canvasWidth, this.canvasHeight);
-      const type = this.waveConfig.zombieTypes[
-        Math.floor(Math.random() * this.waveConfig.zombieTypes.length)
-      ];
+      let type: ZombieType;
+
+      if (this.isBossWave()) {
+        // Boss waves: only spawn boss-specific troops
+        const bossType = this.getBossType(this.currentWave);
+        type = this.getBossTroopType(bossType);
+      } else {
+        type = this.waveConfig.zombieTypes[
+          Math.floor(Math.random() * this.waveConfig.zombieTypes.length)
+        ];
+      }
 
       const enemy = ZombieFactory.createZombie(
         type, pos.x, pos.y,
@@ -145,13 +167,13 @@ export class WaveManager {
       this.enemiesSpawned++;
     }
 
-    // Wave complete
+    // Wave complete — no card selection, transition immediately
     if (
       this.enemiesSpawned >= this.waveConfig.totalZombies &&
       currentEnemyCount === 0
     ) {
       this.isTransitioning = true;
-      this.waitingForCardSelection = true;
+      this.waitingForCardSelection = false;
       this.eventBus.emit(GameEvent.WAVE_COMPLETE, {
         wave: this.currentWave,
       });
@@ -172,19 +194,21 @@ export class WaveManager {
   generatePowerUps(): PowerUp[] {
     const powerUps: PowerUp[] = [];
     const margin = 80;
+    const minSep = 80; // minimum separation between drops
 
-    powerUps.push(new PowerUp(
-      randomBetween(margin, this.canvasWidth - margin),
-      randomBetween(margin, this.canvasHeight - margin),
-      PowerUpType.HEALTH,
-      30,
-    ));
+    const cx = randomBetween(margin, this.canvasWidth - margin);
+    const cy = randomBetween(margin, this.canvasHeight - margin);
+
+    powerUps.push(new PowerUp(cx, cy, PowerUpType.HEALTH, 30));
 
     if (this.currentWave % 2 === 0) {
       const isShotgun = Math.random() < 0.5;
+      // Place ammo at least minSep away from health orb
+      const angle = Math.random() * Math.PI * 2;
+      const ax = Math.min(Math.max(cx + Math.cos(angle) * minSep, margin), this.canvasWidth - margin);
+      const ay = Math.min(Math.max(cy + Math.sin(angle) * minSep, margin), this.canvasHeight - margin);
       powerUps.push(new PowerUp(
-        randomBetween(margin, this.canvasWidth - margin),
-        randomBetween(margin, this.canvasHeight - margin),
+        ax, ay,
         isShotgun ? PowerUpType.AMMO_SHOTGUN : PowerUpType.AMMO_RIFLE,
         isShotgun ? 10 : 20,
       ));

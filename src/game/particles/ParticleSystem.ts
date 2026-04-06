@@ -32,14 +32,13 @@ export class ParticleSystem {
       const spd = randomBetween(speed * 0.5, speed * 1.5);
       const vx = Math.cos(angle) * spd;
       const vy = Math.sin(angle) * spd;
-      const size = randomBetween(2, 6);
+      const size = randomBetween(1.3, 4);   // was 2–6, now ~33% smaller
       const lifetime = randomBetween(0.3, 0.8);
 
       this.particles.push(new Particle(x, y, vx, vy, color, size, lifetime));
     }
   }
 
-  /** Create sparks at bullet impact point */
   createImpact(x: number, y: number, color: string): void {
     const count = 5;
     for (let i = 0; i < count; i++) {
@@ -49,7 +48,7 @@ export class ParticleSystem {
       const vy = Math.sin(angle) * spd;
 
       this.particles.push(
-        new Particle(x, y, vx, vy, color, randomBetween(1.5, 3), randomBetween(0.15, 0.4)),
+        new Particle(x, y, vx, vy, color, randomBetween(1, 2), randomBetween(0.15, 0.4)),
       );
     }
   }

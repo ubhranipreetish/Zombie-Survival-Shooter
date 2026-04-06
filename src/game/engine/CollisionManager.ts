@@ -33,8 +33,6 @@ export class CollisionManager {
    */
   checkBulletEnemyCollisions(bullets: Bullet[], enemies: Enemy[], player: Player): number {
     let kills = 0;
-    // Track how many enemies each bullet has pierced through
-    const bulletPierceHits = new Map<Bullet, number>();
 
     for (const bullet of bullets) {
       if (!bullet.isActive()) continue;
@@ -74,24 +72,16 @@ export class CollisionManager {
             this.particleSystem.createExplosion(pos.x, pos.y, '#ff6600', particleCount, 350);
           }
 
-          // Piercing — track hits, destroy when exceeded
-          const hits = (bulletPierceHits.get(bullet) ?? 0) + 1;
-          bulletPierceHits.set(bullet, hits);
-          if (hits > player.getPierceCount()) {
-            bullet.destroy();
-          }
-
           // Impact particles
           const pos = bullet.getPosition();
           this.particleSystem.createImpact(pos.x, pos.y, enemy.getColor());
 
-          // Lifesteal
-          if (player.getLifestealPercent() > 0) {
-            const healAmount = bullet.getDamage() * player.getLifestealPercent();
-            player.heal(healAmount);
+          // Lifesteal — +1 HP per kill
+          if (player.getLifestealPercent() > 0 && !enemy.isAlive()) {
+            player.heal(1);
           }
 
-          // Check kill
+          // Kill logic
           if (!enemy.isAlive()) {
             kills++;
             const ePos = enemy.getPosition();
@@ -99,9 +89,18 @@ export class CollisionManager {
             this.eventBus.emit(GameEvent.ZOMBIE_KILLED, {
               type: enemy.getType(),
               score: enemy.getScoreValue(),
-              x: ePos.x,
-              y: ePos.y,
+              exp: enemy.getExpValue(),
+              x: enemy.getPosition().x,
+              y: enemy.getPosition().y,
+              weaponName: player.getWeapon().name,
             });
+          }
+
+          // Piercing — destroy when exceeded
+          // The bullet's addHit(enemy) already incremented its internal hit count
+          if (bullet.getHitCount() > player.getPierceCount()) {
+            bullet.destroy();
+            break; // Stop hitting other enemies in the same frame
           }
 
           if (!bullet.isActive()) break;
@@ -161,26 +160,34 @@ export class CollisionManager {
     for (const powerUp of powerUps) {
       if (!powerUp.isActive()) continue;
       if (player.collidesWith(powerUp)) {
-        if (powerUp.getType() === PowerUpType.HEALTH) {
-          player.heal(powerUp.getValue());
-        } else if (powerUp.getType() === PowerUpType.AMMO_SHOTGUN) {
-          player.addAmmo('Shotgun', powerUp.getValue());
-        } else if (powerUp.getType() === PowerUpType.AMMO_RIFLE) {
-          player.addAmmo('Rifle', powerUp.getValue());
-        }
-        const pos = powerUp.getPosition();
-        this.particleSystem.createExplosion(
-          pos.x, pos.y,
-          powerUp.getType() === PowerUpType.HEALTH ? '#4caf50' : '#ffc107',
-          8, 100,
-        );
-        this.eventBus.emit(GameEvent.POWERUP_COLLECTED, {
-          type: powerUp.getType(),
-          value: powerUp.getValue(),
-        });
-        powerUp.destroy();
+        this.collectPowerUp(powerUp, player, this.particleSystem);
       }
     }
+  }
+
+  /** Shared powerup collection logic (used by both collision and magnet) */
+  collectPowerUp(powerUp: PowerUp, player: Player, particleSystem: ParticleSystem): void {
+    if (!powerUp.isActive()) return;
+    if (powerUp.getType() === PowerUpType.HEALTH) {
+      player.heal(powerUp.getValue());
+    } else if (powerUp.getType() === PowerUpType.AMMO_SHOTGUN) {
+      player.addAmmo('Shotgun', powerUp.getValue());
+    } else if (powerUp.getType() === PowerUpType.AMMO_RIFLE) {
+      player.addAmmo('Rifle', powerUp.getValue());
+    } else if (powerUp.getType() === PowerUpType.AMMO_FLAMETHROWER) {
+      player.addAmmo('Flamethrower', powerUp.getValue());
+    }
+    const pos = powerUp.getPosition();
+    particleSystem.createExplosion(
+      pos.x, pos.y,
+      powerUp.getType() === PowerUpType.HEALTH ? '#4caf50' : '#ffc107',
+      8, 100,
+    );
+    this.eventBus.emit(GameEvent.POWERUP_COLLECTED, {
+      type: powerUp.getType(),
+      value: powerUp.getValue(),
+    });
+    powerUp.destroy();
   }
 
   /**
@@ -190,7 +197,7 @@ export class CollisionManager {
     if (!player.getHasOrbitalDrones()) return;
 
     const pos = player.getPosition();
-    const droneRadius = player.getSize() * 2.5;
+    const droneRadius = player.getSize() * 5.0; // matches player's new visual 2x radius
     const droneAngle = player.getDroneAngle();
     const droneDamage = 15;
 
@@ -233,6 +240,7 @@ export class CollisionManager {
           this.eventBus.emit(GameEvent.ZOMBIE_KILLED, {
             type: enemy.getType(),
             score: enemy.getScoreValue(),
+            exp: enemy.getExpValue(),
             x: ePos.x,
             y: ePos.y,
           });

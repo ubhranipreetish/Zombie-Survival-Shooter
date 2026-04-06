@@ -9,11 +9,15 @@ import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { Bullet } from '../entities/Bullet';
 import { PowerUp } from '../entities/PowerUp';
+import { ExpOrb } from '../entities/ExpOrb';
 import { EnemyBullet } from '../entities/EnemyBullet';
 import { NormalZombie } from '../entities/NormalZombie';
 import { Pistol } from '../weapons/Pistol';
 import { Shotgun } from '../weapons/Shotgun';
 import { Rifle } from '../weapons/Rifle';
+import { Flamethrower } from '../weapons/Flamethrower';
+import { LaserRifle } from '../weapons/LaserRifle';
+import { Crossbow } from '../weapons/Crossbow';
 import { IWeaponStrategy } from '../interfaces/IWeaponStrategy';
 import { InputManager } from './InputManager';
 import { CollisionManager } from './CollisionManager';
@@ -22,6 +26,10 @@ import { Renderer } from './Renderer';
 import { ParticleSystem } from '../particles/ParticleSystem';
 import { EventBus } from '../events/EventBus';
 import { CardSystem } from '../systems/CardSystem';
+import { ExpSystem } from '../systems/ExpSystem';
+import { AbilitySystem } from '../systems/AbilitySystem';
+import { AbilityType } from '../systems/AbilitySystem';
+import { Grenade } from '../entities/Grenade';
 import { Vector2D } from '../utils/Vector2D';
 
 export class GameEngine {
@@ -31,6 +39,8 @@ export class GameEngine {
   private waveManager: WaveManager;
   private particleSystem: ParticleSystem;
   private cardSystem: CardSystem;
+  private expSystem: ExpSystem;
+  private abilitySystem: AbilitySystem;
   private eventBus: EventBus;
 
   private gameState: GameState;
@@ -44,13 +54,17 @@ export class GameEngine {
   private bullets: Bullet[];
   private enemyBullets: EnemyBullet[];
   private powerUps: PowerUp[];
+  private expOrbs: ExpOrb[];
+  private grenades: Grenade[];
 
+  private baseWeapons: IWeaponStrategy[];
+  private flamethrower: Flamethrower;
+  private laserRifle: LaserRifle;
+  private crossbow: Crossbow;
   private weapons: IWeaponStrategy[];
   private currentWeaponIndex: number;
+  private activeLevelUpAnim: number;
   private canvas: HTMLCanvasElement;
-
-  private waveTextAlpha: number;
-  private waveTextTimer: number;
 
   // Card selection
   private pendingCardChoices: PowerUpCard[];
@@ -66,6 +80,8 @@ export class GameEngine {
     this.collisionManager = new CollisionManager(this.particleSystem);
     this.waveManager = new WaveManager(canvas.width, canvas.height);
     this.cardSystem = new CardSystem();
+    this.expSystem = new ExpSystem();
+    this.abilitySystem = new AbilitySystem();
     this.eventBus = EventBus.getInstance();
 
     this.gameState = GameState.MENU;
@@ -78,12 +94,16 @@ export class GameEngine {
     this.bullets = [];
     this.enemyBullets = [];
     this.powerUps = [];
+    this.expOrbs = [];
+    this.grenades = [];
 
-    this.weapons = [new Pistol(), new Shotgun(), new Rifle()];
+    this.baseWeapons = [new Pistol(), new Shotgun(), new Rifle()];
+    this.flamethrower = new Flamethrower();
+    this.laserRifle = new LaserRifle();
+    this.crossbow = new Crossbow();
+    this.weapons = [...this.baseWeapons];
     this.currentWeaponIndex = 0;
-
-    this.waveTextAlpha = 0;
-    this.waveTextTimer = 0;
+    this.activeLevelUpAnim = 0;
     this.pendingCardChoices = [];
 
     this.setupEventListeners();
@@ -91,18 +111,28 @@ export class GameEngine {
 
   private setupEventListeners(): void {
     this.eventBus.subscribe(GameEvent.ZOMBIE_KILLED, (data: unknown) => {
-      const killData = data as { score: number; x: number; y: number; weaponName?: string };
+      const killData = data as { score: number; x: number; y: number; weaponName?: string; exp?: number };
       this.score += killData.score;
       this.totalKills++;
       this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score, kills: this.totalKills });
       this.waveManager.onZombieKilled();
 
-      // Random drop: Ammo box (15% chance)
+      // Drop EXP orb at kill position
+      const expAmount = killData.exp ?? killData.score;
+      this.expOrbs.push(new ExpOrb(killData.x, killData.y, expAmount));
+
+      // Random drop: Ammo box (15% chance) — offset so it doesn't overlap the EXP orb
       if (Math.random() < 0.15) {
         const isShotgun = Math.random() < 0.5;
         const type = isShotgun ? PowerUpType.AMMO_SHOTGUN : PowerUpType.AMMO_RIFLE;
         const dropAmount = isShotgun ? 5 + Math.floor(Math.random() * 5) : 10 + Math.floor(Math.random() * 11);
-        this.powerUps.push(new PowerUp(killData.x, killData.y, type, dropAmount));
+        const angle = Math.random() * Math.PI * 2;
+        const offset = 32;
+        this.powerUps.push(new PowerUp(
+          killData.x + Math.cos(angle) * offset,
+          killData.y + Math.sin(angle) * offset,
+          type, dropAmount,
+        ));
       }
     });
 
@@ -110,49 +140,58 @@ export class GameEngine {
       this.score += 50;
       this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score });
 
-      // Wave completion rewards: health + ammo
-      this.player.heal(20);
-      this.player.addAmmo('Shotgun', 15);
-      this.player.addAmmo('Rifle', 30);
+      // Wave completion rewards: +20% max health and +20% max ammo, plus card bonuses
+      const healPct = 0.20 + this.player.getPostRoundHealBonus();
+      const ammoPct = 0.20 + this.player.getPostRoundAmmoBonus();
+      this.player.healPercent(healPct);
+      this.player.addAmmoPercent('Shotgun', ammoPct);
+      this.player.addAmmoPercent('Rifle', ammoPct);
+      if (this.player.isFlamethrowerUnlocked()) {
+        this.player.addAmmoPercent('Flamethrower', ammoPct);
+      }
+      if (this.player.isLaserRifleUnlocked()) this.player.addAmmoPercent('LaserRifle', ammoPct);
+      if (this.player.isCrossbowUnlocked()) this.player.addAmmoPercent('Crossbow', ammoPct);
 
       // Spawn power-ups
       const newPowerUps = this.waveManager.generatePowerUps();
       this.powerUps.push(...newPowerUps);
 
-      this.waveTextAlpha = 1;
-      this.waveTextTimer = 0;
-
-      // Generate card choices and switch to card selection
-      const cards = this.cardSystem.generateCardChoices(
-        this.waveManager.getCurrentWave(),
-      );
-      this.pendingCardChoices = cards;
-
-      // Delay card selection slightly for wave complete animation
-      setTimeout(() => {
-        if (this.gameState === GameState.PLAYING) {
-          this.setGameState(GameState.CARD_SELECTION);
-          this.onCardChoices?.(cards);
-        }
-      }, 1200);
+      this.inputManager.clearInputs();
+      this.player.setMoveDirection(Vector2D.zero());
+      this.player.setFiring(false);
+      // No card selection on wave complete — cards only come from leveling up
     });
 
     this.eventBus.subscribe(GameEvent.WAVE_CHANGED, () => {
-      this.waveTextAlpha = 1;
-      this.waveTextTimer = 0;
     });
 
     // Enemy shooting — ShooterZombie fires via event
     this.eventBus.subscribe(GameEvent.ENEMY_SHOOT, (data: unknown) => {
-      const d = data as { x: number; y: number; dirX: number; dirY: number; speed: number; damage: number };
-      this.enemyBullets.push(new EnemyBullet(d.x, d.y, d.dirX, d.dirY, d.speed, d.damage));
+      const d = data as { x: number; y: number; dirX: number; dirY: number; speed: number; damage: number; radius?: number; isSlam?: boolean };
+      // Fallback for 0,0 direction vector causing NaN on normalize
+      const dirX = d.dirX === 0 && d.dirY === 0 ? 1 : d.dirX;
+      this.enemyBullets.push(new EnemyBullet(d.x, d.y, dirX, d.dirY, d.speed, d.damage, d.radius, d.isSlam));
     });
 
     // SpawnerZombie creates minions via event
     this.eventBus.subscribe(GameEvent.SPAWN_MINION, (data: unknown) => {
       const d = data as { x: number; y: number };
-      const minion = new NormalZombie(d.x, d.y, 0.5, 1.2); // weak but fast minions
+      const minion = new NormalZombie(d.x, d.y, 0.5, 1.2);
       this.enemies.push(minion);
+    });
+
+    // Boss defeated — grant ability
+    this.eventBus.subscribe(GameEvent.BOSS_DEFEATED, (data: unknown) => {
+      const d = data as { type: ZombieType };
+      if (d.type === ZombieType.BOSS_NECROMANCER || d.type === ZombieType.BOSS_JUGGERNAUT) {
+        this.abilitySystem.grantAbility(AbilityType.GRENADE);
+      } else if (d.type === ZombieType.BOSS_HYDRA || d.type === ZombieType.BOSS_PHANTOM) {
+        this.abilitySystem.grantAbility(AbilityType.TELEPORT_BOMB);
+      } else if (d.type === ZombieType.BOSS_WARDEN) {
+        this.abilitySystem.grantAbility(AbilityType.BOUNCING_BULLETS);
+      } else {
+        this.abilitySystem.grantAbility(AbilityType.GRENADE);
+      }
     });
   }
 
@@ -174,7 +213,18 @@ export class GameEngine {
     this.waveManager.onCardSelected();
     this.pendingCardChoices = [];
 
-    // Clear stale input state — fixes stuck movement after card overlay
+    // If a new weapon was unlocked, add it to the active arsenal
+    if (this.player.isFlamethrowerUnlocked() && !this.weapons.includes(this.flamethrower)) {
+      this.weapons.push(this.flamethrower);
+    }
+    if (this.player.isLaserRifleUnlocked() && !this.weapons.includes(this.laserRifle)) {
+      this.weapons.push(this.laserRifle);
+    }
+    if (this.player.isCrossbowUnlocked() && !this.weapons.includes(this.crossbow)) {
+      this.weapons.push(this.crossbow);
+    }
+
+    // Clear stale input state
     this.inputManager.clearInputs();
     this.player.setMoveDirection(Vector2D.zero());
     this.player.setFiring(false);
@@ -182,7 +232,6 @@ export class GameEngine {
 
     this.setGameState(GameState.PLAYING);
 
-    // Refresh HUD ammo display after card selection
     this.eventBus.emit(GameEvent.AMMO_CHANGED, {
       ammo: this.player.getAmmo(),
       maxAmmo: this.weapons[this.currentWeaponIndex].maxAmmo,
@@ -201,12 +250,23 @@ export class GameEngine {
     this.bullets = [];
     this.enemyBullets = [];
     this.powerUps = [];
+    this.expOrbs = [];
+    this.grenades = [];
     this.particleSystem.clear();
     this.cardSystem.reset();
+    this.expSystem.reset();
+    this.abilitySystem.reset();
     EventBus.resetInstance();
     this.eventBus = EventBus.getInstance();
     this.setupEventListeners();
     this.waveManager = new WaveManager(this.canvas.width, this.canvas.height);
+
+    this.baseWeapons = [new Pistol(), new Shotgun(), new Rifle()];
+    this.flamethrower = new Flamethrower();
+    this.laserRifle = new LaserRifle();
+    this.crossbow = new Crossbow();
+    this.weapons = [...this.baseWeapons];
+    this.currentWeaponIndex = 0;
 
     this.player = new Player(
       this.canvas.width / 2,
@@ -215,7 +275,6 @@ export class GameEngine {
       this.canvas.width,
       this.canvas.height,
     );
-    this.currentWeaponIndex = 0;
 
     this.setGameState(GameState.PLAYING);
 
@@ -234,6 +293,11 @@ export class GameEngine {
       weaponName: this.weapons[0].name,
     });
     this.eventBus.emit(GameEvent.PLAYER_STATS_CHANGED, this.player.getStats());
+    this.eventBus.emit(GameEvent.EXP_CHANGED, {
+      exp: 0,
+      expToNext: this.expSystem.getExpForLevel(1),
+      level: 1,
+    });
 
     this.lastFrameTime = performance.now();
     this.gameLoop(this.lastFrameTime);
@@ -250,6 +314,11 @@ export class GameEngine {
       this.cleanup();
     }
 
+    // LEVEL_UP state: game is frozen, waiting for banner timeout
+    if (this.gameState === GameState.LEVEL_UP) {
+      // nothing updates — fully paused
+    }
+
     this.render();
     this.animationFrameId = requestAnimationFrame(this.gameLoop);
   };
@@ -259,16 +328,71 @@ export class GameEngine {
     this.player.setMousePosition(this.inputManager.getMousePosition());
     this.player.setFiring(this.inputManager.isMouseDown());
 
-    if (this.inputManager.consumeKey('1')) this.switchWeapon(0);
-    if (this.inputManager.consumeKey('2')) this.switchWeapon(1);
-    if (this.inputManager.consumeKey('3')) this.switchWeapon(2);
+    // Weapon switching mapping natively to current active indices
+    if (this.inputManager.consumeKey('1') && this.weapons.length > 0) this.switchWeapon(0);
+    if (this.inputManager.consumeKey('2') && this.weapons.length > 1) this.switchWeapon(1);
+    if (this.inputManager.consumeKey('3') && this.weapons.length > 2) this.switchWeapon(2);
+    if (this.inputManager.consumeKey('4') && this.weapons.length > 3) this.switchWeapon(3);
+    if (this.inputManager.consumeKey('5') && this.weapons.length > 4) this.switchWeapon(4);
+    if (this.inputManager.consumeKey('6') && this.weapons.length > 5) this.switchWeapon(5);
+
+    // Spacebar ability
+    if (this.inputManager.consumeKey(' ')) {
+      const mousePos = this.inputManager.getMousePosition();
+      const action = this.abilitySystem.tryActivate(mousePos.x, mousePos.y);
+      if (action) {
+        this.executeAbility(action.type, action.targetX, action.targetY);
+      }
+    }
 
     if (this.inputManager.consumeKey('Escape')) {
-      // Clear all held keys + reset player so nothing is "stuck" during the pause
       this.inputManager.clearInputs();
       this.player.setMoveDirection(Vector2D.zero());
       this.player.setFiring(false);
       this.setGameState(GameState.PAUSED);
+    }
+  }
+
+  private executeAbility(type: AbilityType, targetX: number, targetY: number): void {
+    const playerPos = this.player.getPosition();
+    if (type === AbilityType.GRENADE) {
+      this.grenades.push(new Grenade(
+        playerPos.x, playerPos.y,
+        targetX, targetY,
+        this.abilitySystem.getGrenadeDamage(),
+        this.abilitySystem.getGrenadeRadius(),
+      ));
+    } else if (type === AbilityType.TELEPORT_BOMB) {
+      // Teleport bomb TNT enhancement: drop actual TNT at player's ORIGINAL position
+      const originalPos = this.player.getPosition();
+      this.grenades.push(new Grenade(
+        originalPos.x, originalPos.y,
+        originalPos.x, originalPos.y,
+        this.abilitySystem.getTeleportBombDamage(),
+        this.abilitySystem.getTeleportBombRadius(), // TNT drops right here
+      ));
+
+      // Teleport player to target, then explode there as well (double bomb)
+      this.player.teleportTo(targetX, targetY);
+      const radius = this.abilitySystem.getTeleportBombRadius();
+      const damage = this.abilitySystem.getTeleportBombDamage();
+      this.particleSystem.createExplosion(targetX, targetY, '#ff00ff', 50, 500);
+      for (const enemy of this.enemies) {
+        if (!enemy.isActive()) continue;
+        if (enemy.getPosition().distanceTo(new Vector2D(targetX, targetY)) < radius) {
+          enemy.takeDamage(damage);
+          if (!enemy.isAlive()) {
+            const ePos = enemy.getPosition();
+            this.particleSystem.createExplosion(ePos.x, ePos.y, enemy.getColor(), 12, 180);
+            this.eventBus.emit(GameEvent.ZOMBIE_KILLED, {
+              type: enemy.getType(), score: enemy.getScoreValue(),
+              exp: enemy.getExpValue(), x: ePos.x, y: ePos.y,
+            });
+          }
+        }
+      }
+    } else if (type === AbilityType.BOUNCING_BULLETS) {
+      // Bouncing bullets handled in bullet update — just flag is enough (already set in abilitySystem)
     }
   }
 
@@ -281,6 +405,7 @@ export class GameEngine {
 
   private update(deltaTime: number, currentTime: number): void {
     this.player.update(deltaTime);
+    this.abilitySystem.update(deltaTime);
 
     // Player firing
     const bulletConfigs = this.player.tryFire(currentTime);
@@ -337,8 +462,74 @@ export class GameEngine {
     for (const bullet of this.bullets) bullet.update(deltaTime);
     for (const bullet of this.enemyBullets) bullet.update(deltaTime);
 
-    // Update power-ups
+    // Update power-ups and exp orbs
     for (const powerUp of this.powerUps) powerUp.update(deltaTime);
+    for (const orb of this.expOrbs) orb.update(deltaTime);
+
+    // Update grenades
+    for (const grenade of this.grenades) {
+      grenade.update(deltaTime);
+      if (grenade.hasReachedTarget() && !grenade.didExplode()) {
+        const pos = grenade.getPosition();
+        const radius = grenade.getExplosionRadius();
+        const damage = grenade.getExplosionDamage();
+        this.particleSystem.createExplosion(pos.x, pos.y, '#ff6600', 40, 400);
+        for (const enemy of this.enemies) {
+          if (!enemy.isActive()) continue;
+          if (pos.distanceTo(enemy.getPosition()) < radius) {
+            enemy.takeDamage(damage);
+            if (!enemy.isAlive()) {
+              const ePos = enemy.getPosition();
+              this.particleSystem.createExplosion(ePos.x, ePos.y, enemy.getColor(), 12, 180);
+              this.eventBus.emit(GameEvent.ZOMBIE_KILLED, {
+                type: enemy.getType(), score: enemy.getScoreValue(),
+                exp: enemy.getExpValue(), x: ePos.x, y: ePos.y,
+              });
+            }
+          }
+        }
+        grenade.markExploded();
+      }
+    }
+
+    // Magnet: pull exp orbs and powerups toward player
+    const magnetRadius = this.player.getMagnetRadius();
+    if (magnetRadius > 0) {
+      const playerPos = this.player.getPosition();
+      for (const orb of this.expOrbs) {
+        if (!orb.isActive()) continue;
+        const dist = playerPos.distanceTo(orb.getPosition());
+        if (dist < magnetRadius) {
+          orb.destroy(); // instant collect
+          this.expSystem.addExp(orb.getExpValue());
+          this.particleSystem.createExplosion(orb.getPosition().x, orb.getPosition().y, '#29b6f6', 4, 60);
+        }
+      }
+      for (const powerUp of this.powerUps) {
+        if (!powerUp.isActive()) continue;
+        const dist = playerPos.distanceTo(powerUp.getPosition());
+        if (dist < magnetRadius) {
+          this.collisionManager.collectPowerUp(powerUp, this.player, this.particleSystem);
+        }
+      }
+    }
+
+    // Level-up: pause to show banner, then open card selection
+    if (this.expSystem.consumeLevelUp()) {
+      const cards = this.cardSystem.generateCardChoices(this.waveManager.getCurrentWave());
+      this.pendingCardChoices = cards;
+      this.inputManager.clearInputs();
+      this.player.setMoveDirection(Vector2D.zero());
+      this.player.setFiring(false);
+      this.setGameState(GameState.LEVEL_UP);
+      setTimeout(() => {
+        if (this.gameState === GameState.LEVEL_UP) {
+          this.lastFrameTime = performance.now();
+          this.setGameState(GameState.CARD_SELECTION);
+          this.onCardChoices?.(cards);
+        }
+      }, 1800);
+    }
 
     // Update particles
     this.particleSystem.update(deltaTime);
@@ -347,14 +538,6 @@ export class GameEngine {
     const activeEnemyCount = this.enemies.filter((e) => e.isActive()).length;
     const newEnemies = this.waveManager.update(deltaTime, activeEnemyCount);
     this.enemies.push(...newEnemies);
-
-    // Wave text
-    if (this.waveTextAlpha > 0) {
-      this.waveTextTimer += deltaTime;
-      if (this.waveTextTimer > 1.5) {
-        this.waveTextAlpha -= deltaTime * 2;
-      }
-    }
 
     // Player death check
     if (!this.player.isAlive()) {
@@ -367,6 +550,17 @@ export class GameEngine {
     this.collisionManager.checkEnemyPlayerCollisions(this.enemies, this.player);
     this.collisionManager.checkEnemyBulletPlayerCollisions(this.enemyBullets, this.player);
     this.collisionManager.checkPlayerPowerUpCollisions(this.player, this.powerUps);
+
+    // EXP orb collection
+    const playerPos = this.player.getPosition();
+    for (const orb of this.expOrbs) {
+      if (!orb.isActive()) continue;
+      if (this.player.collidesWith(orb)) {
+        this.expSystem.addExp(orb.getExpValue());
+        this.particleSystem.createExplosion(orb.getPosition().x, orb.getPosition().y, '#29b6f6', 5, 80);
+        orb.destroy();
+      }
+    }
 
     // Drone collisions
     if (this.player.getHasOrbitalDrones()) {
@@ -392,6 +586,7 @@ export class GameEngine {
               this.eventBus.emit(GameEvent.ZOMBIE_KILLED, {
                 type: enemy.getType(),
                 score: enemy.getScoreValue(),
+                exp: enemy.getExpValue(),
                 x: ePos.x,
                 y: ePos.y,
               });
@@ -414,6 +609,8 @@ export class GameEngine {
       b.isActive() && !b.isOffScreen(this.canvas.width, this.canvas.height),
     );
     this.powerUps = this.powerUps.filter((p) => p.isActive());
+    this.expOrbs = this.expOrbs.filter((o) => o.isActive());
+    this.grenades = this.grenades.filter((g) => g.isActive());
   }
 
   private render(): void {
@@ -423,9 +620,12 @@ export class GameEngine {
     if (
       this.gameState === GameState.PLAYING ||
       this.gameState === GameState.PAUSED ||
+      this.gameState === GameState.LEVEL_UP ||
       this.gameState === GameState.CARD_SELECTION
     ) {
       this.renderer.renderObjects(this.powerUps);
+      this.renderer.renderObjects(this.expOrbs);
+      this.renderer.renderObjects(this.grenades);
       this.renderer.renderObjects(this.enemies);
       this.renderer.renderObjects(this.bullets);
       this.renderer.renderObjects(this.enemyBullets);
@@ -435,13 +635,6 @@ export class GameEngine {
 
       const mousePos = this.inputManager.getMousePosition();
       this.renderer.drawCrosshair(mousePos.x, mousePos.y);
-
-      if (this.waveTextAlpha > 0) {
-        this.renderer.drawWaveText(
-          this.waveManager.getCurrentWave(),
-          this.waveTextAlpha,
-        );
-      }
     }
   }
 

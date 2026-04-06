@@ -6,7 +6,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '@/game/engine/GameEngine';
-import { GameState, PowerUpCard } from '@/game/interfaces/types';
+import { GameState, PowerUpCard, GameEvent } from '@/game/interfaces/types';
+import { EventBus } from '@/game/events/EventBus';
 import HUD from './HUD';
 import MainMenu from './MainMenu';
 import GameOverScreen from './GameOverScreen';
@@ -19,6 +20,8 @@ export default function GameCanvas() {
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
   const [cardChoices, setCardChoices] = useState<PowerUpCard[]>([]);
   const [collectedCards, setCollectedCards] = useState<PowerUpCard[]>([]);
+  const [score, setScore] = useState(0);
+  const [level, setLevel] = useState(1);
 
   const getCanvasSize = useCallback(() => {
     return {
@@ -40,6 +43,14 @@ export default function GameCanvas() {
     engine.setOnCardChoices((cards) => setCardChoices(cards));
     engineRef.current = engine;
 
+    const eb = EventBus.getInstance();
+    const unsubScore = eb.subscribe(GameEvent.SCORE_CHANGED, (d: unknown) => {
+      setScore((d as { score: number }).score);
+    });
+    const unsubExp = eb.subscribe(GameEvent.EXP_CHANGED, (d: unknown) => {
+      setLevel((d as { level: number }).level);
+    });
+
     const handleResize = () => {
       const { width, height } = getCanvasSize();
       canvas.width = width;
@@ -50,6 +61,8 @@ export default function GameCanvas() {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      unsubScore();
+      unsubExp();
       engine.destroy();
       engineRef.current = null;
     };
@@ -71,6 +84,8 @@ export default function GameCanvas() {
 
   const handleStartGame = useCallback(() => {
     setCollectedCards([]);
+    setScore(0);
+    setLevel(1);
     engineRef.current?.startGame();
   }, []);
 
@@ -124,13 +139,17 @@ export default function GameCanvas() {
         <MainMenu onStartGame={handleStartGame} />
       )}
 
-      {(gameState === GameState.PLAYING || gameState === GameState.CARD_SELECTION) && <HUD />}
+      {(gameState === GameState.PLAYING ||
+        gameState === GameState.CARD_SELECTION ||
+        gameState === GameState.LEVEL_UP) && <HUD />}
 
       {gameState === GameState.CARD_SELECTION && cardChoices.length > 0 && (
         <CardSelection
           cards={cardChoices}
           collectedCards={collectedCards}
           onSelect={handleCardSelect}
+          score={score}
+          level={level}
         />
       )}
 

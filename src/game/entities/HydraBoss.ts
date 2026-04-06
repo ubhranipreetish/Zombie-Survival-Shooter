@@ -22,12 +22,12 @@ export class HydraBoss extends Enemy {
     super(
       x, y,
       35,
-      800 * healthMultiplier,
+      1200 * healthMultiplier,
       25,
       20,
       200,
     );
-    this.headCount = 5;
+    this.headCount = 7;
     this.shootTimer = 0;
     this.shootCooldown = 1.5;
     this.burstTimer = 0;
@@ -40,6 +40,33 @@ export class HydraBoss extends Enemy {
   protected getGlowColor(): string { return 'rgba(0, 191, 165, 0.3)'; }
   getType(): ZombieType { return ZombieType.BOSS_HYDRA; }
   getIsBoss(): boolean { return this.isBoss; }
+
+  takeDamage(amount: number): void {
+    super.takeDamage(amount);
+    if (this.health <= 0) {
+      EventBus.getInstance().emit(GameEvent.BOSS_DEFEATED, {
+        type: ZombieType.BOSS_HYDRA,
+      });
+    }
+  }
+
+  // Signature move: massive 360° bullet burst
+  protected performSignatureMove(): void {
+    const count = this.headCount * 4; // Double normal burst pattern
+    for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        EventBus.getInstance().emit(GameEvent.ENEMY_SHOOT, {
+          x: this.position.x + dx * (this.size + 10),
+          y: this.position.y + dy * (this.size + 10),
+          dirX: dx,
+          dirY: dy,
+          speed: 250,
+          damage: 15,
+        });
+    }
+  }
 
   update(deltaTime: number): void {
     super.update(deltaTime);

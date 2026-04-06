@@ -7,7 +7,7 @@ import { Enemy } from './Enemy';
 import { ZombieType } from '../interfaces/types';
 import { Vector2D } from '../utils/Vector2D';
 import { EventBus } from '../events/EventBus';
-import { GameEvent } from '../interfaces/types';
+import { GameEvent, ZombieType as ZT } from '../interfaces/types';
 
 export class JuggernautBoss extends Enemy {
   private chargeTimer: number;
@@ -17,6 +17,13 @@ export class JuggernautBoss extends Enemy {
   private chargeSpeed: number;
   private chargeDuration: number;
   private chargeElapsed: number;
+
+  // Dashboard preview logic
+  private isWindingUp: boolean;
+  private windUpTimer: number;
+  private windUpDuration: number;
+  private lockedChargeDirection: Vector2D;
+
   private slamTimer: number;
   private slamCooldown: number;
   private slamFlash: number;
@@ -27,18 +34,22 @@ export class JuggernautBoss extends Enemy {
     super(
       x, y,
       32,
-      600 * healthMultiplier,
-      30,
+      900 * healthMultiplier,
+      180, // speed: as fast as the player (up from 30)
       25,
       150,
     );
     this.chargeTimer = 3;
-    this.chargeCooldown = 6;
+    this.chargeCooldown = 3; // dashed more often (down from 6)
     this.isCharging = false;
     this.chargeDirection = Vector2D.zero();
-    this.chargeSpeed = 400;
+    this.chargeSpeed = 500;
     this.chargeDuration = 1.0;
     this.chargeElapsed = 0;
+    this.isWindingUp = false;
+    this.windUpTimer = 0;
+    this.windUpDuration = 0.8;
+    this.lockedChargeDirection = Vector2D.zero();
     this.slamTimer = 0;
     this.slamCooldown = 8;
     this.slamFlash = 0;
@@ -49,6 +60,34 @@ export class JuggernautBoss extends Enemy {
   protected getGlowColor(): string { return 'rgba(211, 47, 47, 0.3)'; }
   getType(): ZombieType { return ZombieType.BOSS_JUGGERNAUT; }
   getIsBoss(): boolean { return this.isBoss; }
+
+  takeDamage(amount: number): void {
+    super.takeDamage(amount);
+    if (this.health <= 0) {
+      EventBus.getInstance().emit(GameEvent.BOSS_DEFEATED, {
+        type: ZombieType.BOSS_JUGGERNAUT,
+      });
+    }
+  }
+
+  // Signature move: massive ground slam followed immediately by a dash
+  protected performSignatureMove(): void {
+    this.slamFlash = 0.8;
+    EventBus.getInstance().emit(GameEvent.ENEMY_SHOOT, {
+      x: this.position.x,
+      y: this.position.y,
+      dirX: 0, dirY: 0,
+      speed: 0,
+      damage: 60,
+      isSlam: true,
+      radius: 200, // larger radius
+    });
+
+    // Reset charge timers to trigger a dash soon
+    this.isCharging = false;
+    this.isWindingUp = false;
+    this.chargeTimer = this.chargeCooldown;
+  }
 
   update(deltaTime: number): void {
     this.armorPhase += deltaTime;
@@ -61,13 +100,21 @@ export class JuggernautBoss extends Enemy {
         this.isCharging = false;
         this.chargeTimer = 0;
       }
+    } else if (this.isWindingUp) {
+      this.windUpTimer += deltaTime;
+      if (this.windUpTimer >= this.windUpDuration) {
+        this.isWindingUp = false;
+        this.isCharging = true;
+        this.chargeElapsed = 0;
+        this.chargeDirection = this.lockedChargeDirection;
+      }
     } else {
       super.update(deltaTime);
       this.chargeTimer += deltaTime;
       if (this.chargeTimer >= this.chargeCooldown) {
-        this.isCharging = true;
-        this.chargeElapsed = 0;
-        this.chargeDirection = this.playerPosition.subtract(this.position).normalize();
+        this.isWindingUp = true;
+        this.windUpTimer = 0;
+        this.lockedChargeDirection = this.playerPosition.subtract(this.position).normalize();
       }
     }
 
@@ -115,10 +162,36 @@ export class JuggernautBoss extends Enemy {
       }
     }
 
+    // Charge wind-up path preview
+    if (this.isWindingUp) {
+      ctx.strokeStyle = `rgba(255, 0, 0, ${0.4 + Math.sin(this.windUpTimer * 20) * 0.2})`;
+      ctx.lineWidth = 4;
+      ctx.setLineDash([10, 10]);
+
+      const pathLength = this.chargeSpeed * this.chargeDuration;
+      const endX = x + this.lockedChargeDirection.x * pathLength;
+      const endY = y + this.lockedChargeDirection.y * pathLength;
+
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Arrow head at end of dash
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.moveTo(endX + this.lockedChargeDirection.x * 10, endY + this.lockedChargeDirection.y * 10);
+      const perp = new Vector2D(-this.lockedChargeDirection.y, this.lockedChargeDirection.x);
+      ctx.lineTo(endX + perp.x * 10 - this.lockedChargeDirection.x * 10, endY + perp.y * 10 - this.lockedChargeDirection.y * 10);
+      ctx.lineTo(endX - perp.x * 10 - this.lockedChargeDirection.x * 10, endY - perp.y * 10 - this.lockedChargeDirection.y * 10);
+      ctx.fill();
+    }
+
     // Slam shockwave
     if (this.slamFlash > 0) {
-      const shockSize = (0.5 - this.slamFlash) * 300;
-      ctx.strokeStyle = `rgba(255, 87, 34, ${this.slamFlash * 2})`;
+      const shockSize = Math.max(0.1, (0.8 - this.slamFlash) * 400);
+      ctx.strokeStyle = `rgba(255, 87, 34, ${this.slamFlash})`;
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.arc(x, y, shockSize, 0, Math.PI * 2);
@@ -183,7 +256,7 @@ export class JuggernautBoss extends Enemy {
     ctx.fill();
 
     // Charge indicator
-    if (!this.isCharging) {
+    if (!this.isCharging && !this.isWindingUp) {
       const chargePct = this.chargeTimer / this.chargeCooldown;
       if (chargePct > 0.6) {
         ctx.strokeStyle = `rgba(255, 87, 34, ${(chargePct - 0.6) * 2.5})`;

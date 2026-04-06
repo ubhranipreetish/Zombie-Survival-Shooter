@@ -22,6 +22,10 @@ export class Bullet extends GameObject {
   private maxLifetime: number;
   private trail: { x: number; y: number; alpha: number }[];
   private hitEnemies: Set<Enemy>; // track enemies hit for pierce logic
+  private totalHits: number;      // track total hits across frames
+  private bouncesRemaining: number;  // bouncing bullets ability
+  private canvasWidth: number;
+  private canvasHeight: number;
 
   constructor(
     x: number, y: number,
@@ -30,16 +34,23 @@ export class Bullet extends GameObject {
     damage: number,
     size: number = 3,
     color: string = '#ffdd00',
+    bounces: number = 0,
+    canvasWidth: number = 1920,
+    canvasHeight: number = 1080,
   ) {
     super(x, y, size);
     this.direction = new Vector2D(dirX, dirY).normalize();
     this.speed = speed;
     this.damage = damage;
     this.color = color;
-    this.maxLifetime = 2.0;
+    this.maxLifetime = bounces > 0 ? 4.0 : 2.0; // bouncing bullets live longer
     this.lifetime = 0;
     this.trail = [];
     this.hitEnemies = new Set();
+    this.totalHits = 0;
+    this.bouncesRemaining = bounces;
+    this.canvasWidth = canvasWidth;
+    this.canvasHeight = canvasHeight;
   }
 
   hasHit(enemy: Enemy): boolean {
@@ -48,11 +59,25 @@ export class Bullet extends GameObject {
 
   addHit(enemy: Enemy): void {
     this.hitEnemies.add(enemy);
+    this.totalHits++;
+  }
+
+  getHitCount(): number {
+    return this.totalHits;
   }
 
   getDamage(): number {
     return this.damage;
   }
+
+  setBouncing(bounces: number, canvasW: number, canvasH: number): void {
+    this.bouncesRemaining = bounces;
+    this.canvasWidth = canvasW;
+    this.canvasHeight = canvasH;
+    this.maxLifetime = 4.0;
+  }
+
+  isBouncing(): boolean { return this.bouncesRemaining > 0; }
 
   update(deltaTime: number): void {
     // Store trail position
@@ -75,6 +100,27 @@ export class Bullet extends GameObject {
     // Move bullet
     const moveAmount = this.direction.scale(this.speed * deltaTime);
     this.position = this.position.add(moveAmount);
+
+    // Bounce off canvas edges
+    if (this.bouncesRemaining > 0) {
+      let dx = this.direction.x;
+      let dy = this.direction.y;
+      let bounced = false;
+      if (this.position.x < 0 || this.position.x > this.canvasWidth) {
+        dx = -dx;
+        bounced = true;
+      }
+      if (this.position.y < 0 || this.position.y > this.canvasHeight) {
+        dy = -dy;
+        bounced = true;
+      }
+      if (bounced) {
+        this.direction = new Vector2D(dx, dy).normalize();
+        this.bouncesRemaining--;
+        // Clear hit enemies on bounce so it can re-hit
+        this.hitEnemies.clear();
+      }
+    }
 
     // Track lifetime
     this.lifetime += deltaTime;
@@ -120,8 +166,9 @@ export class Bullet extends GameObject {
     ctx.fill();
   }
 
-  /** Check if bullet is off-screen */
+  /** Check if bullet is off-screen — never offscreen while bouncing */
   isOffScreen(canvasWidth: number, canvasHeight: number): boolean {
+    if (this.bouncesRemaining > 0) return false;
     const margin = 100;
     return (
       this.position.x < -margin ||

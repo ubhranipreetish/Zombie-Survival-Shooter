@@ -53,6 +53,13 @@ export class Player extends GameObject implements IDamageable {
   private autoExplosionDamage: number;
   private droneCount: number; // was hasOrbitalDrones
   private droneAngle: number;
+  private critChance: number;     // critical hit chance (0–1)
+  private magnetRadius: number;    // powerup attraction radius
+  private flamethrowerUnlocked: boolean;
+  private laserRifleUnlocked: boolean;
+  private crossbowUnlocked: boolean;
+  private postRoundHealBonus: number;  // extra % healed after each wave
+  private postRoundAmmoBonus: number;  // extra % ammo added after each wave
 
   constructor(
     x: number,
@@ -106,6 +113,14 @@ export class Player extends GameObject implements IDamageable {
 
     this.droneCount = 0;
     this.droneAngle = 0;
+
+    this.critChance = 0;
+    this.magnetRadius = 0;
+    this.flamethrowerUnlocked = false;
+    this.laserRifleUnlocked = false;
+    this.crossbowUnlocked = false;
+    this.postRoundHealBonus = 0;
+    this.postRoundAmmoBonus = 0;
   }
 
   getStats(): any {
@@ -127,6 +142,11 @@ export class Player extends GameObject implements IDamageable {
       autoExplosionLevel: this.autoExplosionLevel,
       autoExplosionDamage: this.autoExplosionDamage,
       droneCount: this.droneCount,
+      critChance: this.critChance,
+      magnetRadius: this.magnetRadius,
+      flamethrowerUnlocked: this.flamethrowerUnlocked,
+      laserRifleUnlocked: this.laserRifleUnlocked,
+      crossbowUnlocked: this.crossbowUnlocked,
     };
   }
 
@@ -234,6 +254,19 @@ export class Player extends GameObject implements IDamageable {
     });
   }
 
+  healPercent(pct: number): void {
+    this.heal(this.maxHealth * pct);
+  }
+
+  addAmmoPercent(weaponName: string, pct: number): void {
+    // Find the max ammo for this weapon from the weapons list
+    const maxAmmoMap: Record<string, number> = {
+      Shotgun: 30, Rifle: 90, Flamethrower: 200, LaserRifle: 150, Crossbow: 40,
+    };
+    const max = maxAmmoMap[weaponName] ?? 30;
+    this.addAmmo(weaponName, Math.ceil(max * pct));
+  }
+
   // ----- Card Effect System -----
 
   /**
@@ -244,11 +277,13 @@ export class Player extends GameObject implements IDamageable {
     switch (card.effectType) {
       case CardEffectType.HEAL:
         this.heal(card.value);
+        this.postRoundHealBonus += 0.10;
         break;
 
       case CardEffectType.AMMO_REFILL:
         this.ammo.set('Shotgun', 30);
         this.ammo.set('Rifle', 90);
+        this.postRoundAmmoBonus += 0.10;
         break;
 
       case CardEffectType.SPEED_BOOST:
@@ -298,8 +333,8 @@ export class Player extends GameObject implements IDamageable {
 
       case CardEffectType.FREEZE_AURA:
         this.freezeLevel += 1;
-        // Start small and scale gradually: Lv1=40r/8%, Lv2=60r/16%, Lv3=80r/24%, Lv4=100r/32%, Lv5=120r/40%
-        this.freezeRadius = 20 + (this.freezeLevel * 20);
+        // Start bigger and scale faster: Lv1=80r/8%, Lv2=120r/16%, Lv3=160r/24%...
+        this.freezeRadius = 40 + (this.freezeLevel * 40);
         this.freezeStrength = Math.min(0.8, 0.08 * this.freezeLevel);
         break;
 
@@ -316,7 +351,52 @@ export class Player extends GameObject implements IDamageable {
         break;
 
       case CardEffectType.ORBITAL_DRONES:
-        this.droneCount += card.value;
+        if (this.droneCount === 0) {
+          this.droneCount = 3;
+        } else {
+          this.droneCount += card.value;
+        }
+        break;
+
+      case CardEffectType.CRITICAL_HIT:
+        // Lv1=15%, Lv2=25%, Lv3=35%...
+        this.critChance = Math.min(0.75, this.critChance + card.value);
+        break;
+
+      case CardEffectType.MAGNET_PULL:
+        // Each stack adds 200px radius
+        this.magnetRadius += card.value;
+        break;
+
+      case CardEffectType.FLAMETHROWER_UNLOCK:
+        this.flamethrowerUnlocked = true;
+        // Grant initial ammo
+        this.ammo.set('Flamethrower', 120);
+        break;
+
+      case CardEffectType.FLAMETHROWER_AMMO:
+        const ftAmmo = this.ammo.get('Flamethrower') ?? 0;
+        this.ammo.set('Flamethrower', ftAmmo + Math.round(card.value));
+        break;
+
+      case CardEffectType.LASER_RIFLE_UNLOCK:
+        this.laserRifleUnlocked = true;
+        this.ammo.set('LaserRifle', 150);
+        break;
+      
+      case CardEffectType.LASER_RIFLE_AMMO:
+        const lrAmmo = this.ammo.get('LaserRifle') ?? 0;
+        this.ammo.set('LaserRifle', lrAmmo + Math.round(card.value));
+        break;
+
+      case CardEffectType.CROSSBOW_UNLOCK:
+        this.crossbowUnlocked = true;
+        this.ammo.set('Crossbow', 40);
+        break;
+
+      case CardEffectType.CROSSBOW_AMMO:
+        const cbAmmo = this.ammo.get('Crossbow') ?? 0;
+        this.ammo.set('Crossbow', cbAmmo + Math.round(card.value));
         break;
     }
     this.emitStats();
@@ -372,6 +452,28 @@ export class Player extends GameObject implements IDamageable {
     return this.droneAngle;
   }
 
+  getPostRoundHealBonus(): number { return this.postRoundHealBonus; }
+  getPostRoundAmmoBonus(): number { return this.postRoundAmmoBonus; }
+
+  getMagnetRadius(): number {
+    return this.magnetRadius;
+  }
+
+  isFlamethrowerUnlocked(): boolean {
+    return this.flamethrowerUnlocked;
+  }
+
+  isLaserRifleUnlocked(): boolean { return this.laserRifleUnlocked; }
+  isCrossbowUnlocked(): boolean { return this.crossbowUnlocked; }
+
+  teleportTo(x: number, y: number): void {
+    const margin = this.size;
+    this.position = new Vector2D(
+      clamp(x, margin, this.canvasWidth - margin),
+      clamp(y, margin, this.canvasHeight - margin),
+    );
+  }
+
   // ----- Firing -----
 
   tryFire(currentTime: number): BulletConfig[] | null {
@@ -398,13 +500,24 @@ export class Player extends GameObject implements IDamageable {
     const aimDir = Vector2D.fromAngle(this.aimAngle);
     let bullets = this.weapon.fire(this.position, aimDir);
 
-    // Apply damage multiplier
+    // Critical hit roll
+    const isCrit = this.critChance > 0 && Math.random() < this.critChance;
+    const critMult = isCrit ? 3 : 1;
+
+    // Apply damage multiplier + crit
     bullets = bullets.map((b) => ({
       ...b,
-      damage: b.damage * this.damageMultiplier,
+      damage: b.damage * this.damageMultiplier * critMult,
     }));
 
-    // Double Gun — fire a second set from offset position (scales with extraGunCount)
+    if (isCrit) {
+      EventBus.getInstance().emit(GameEvent.CRIT_HIT, {
+        x: this.position.x + Math.cos(this.aimAngle) * 30,
+        y: this.position.y + Math.sin(this.aimAngle) * 30,
+      });
+    }
+
+    // Double Gun
     if (this.extraGunCount > 0) {
       const perpendicular = new Vector2D(-aimDir.y, aimDir.x);
       const offset = perpendicular.scale(12);
@@ -413,14 +526,14 @@ export class Player extends GameObject implements IDamageable {
         aimDir,
       ).map((b) => ({
         ...b,
-        damage: b.damage * this.damageMultiplier,
+        damage: b.damage * this.damageMultiplier * critMult,
         x: b.x + offset.x,
         y: b.y + offset.y,
       }));
       bullets = [...bullets, ...secondBullets];
     }
 
-    // Bullet Storm — fire extra copies at slight angles
+    // Bullet Storm
     if (this.bulletStormCount > 1) {
       const extraBullets: BulletConfig[] = [];
       for (let i = 1; i < this.bulletStormCount; i++) {
@@ -428,7 +541,7 @@ export class Player extends GameObject implements IDamageable {
         const stormDir = aimDir.rotate(angleOffset);
         const stormBullets = this.weapon.fire(this.position, stormDir).map((b) => ({
           ...b,
-          damage: b.damage * this.damageMultiplier * 0.6,
+          damage: b.damage * this.damageMultiplier * critMult * 0.6,
         }));
         extraBullets.push(...stormBullets);
       }
@@ -651,7 +764,7 @@ export class Player extends GameObject implements IDamageable {
 
     // Orbital drones
     if (this.droneCount > 0) {
-      const droneRadius = this.size * 2.5;
+      const droneRadius = this.size * 5.0; // orbit radius 2x bigger
       for (let i = 0; i < this.droneCount; i++) {
         const angle = this.droneAngle + (i / this.droneCount) * Math.PI * 2;
         const dx = x + Math.cos(angle) * droneRadius;
