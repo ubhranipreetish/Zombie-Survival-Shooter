@@ -33,6 +33,11 @@ export abstract class GameObject implements IRenderable, IUpdatable {
     return this.position;
   }
 
+  /** Set current position manually */
+  setPosition(pos: Vector2D): void {
+    this.position = pos;
+  }
+
   /** Get collision radius */
   getSize(): number {
     return this.size;

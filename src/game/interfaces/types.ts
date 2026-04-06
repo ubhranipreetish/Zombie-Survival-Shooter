@@ -36,7 +36,8 @@ export enum ZombieType {
  */
 export enum PowerUpType {
   HEALTH = 'HEALTH',
-  AMMO = 'AMMO',
+  AMMO_SHOTGUN = 'AMMO_SHOTGUN',
+  AMMO_RIFLE = 'AMMO_RIFLE',
 }
 
 /**
@@ -111,6 +112,7 @@ export enum GameEvent {
   SPAWN_MINION = 'SPAWN_MINION',
   BOSS_HEALTH_CHANGED = 'BOSS_HEALTH_CHANGED',
   BOSS_DEFEATED = 'BOSS_DEFEATED',
+  PLAYER_STATS_CHANGED = 'PLAYER_STATS_CHANGED',
 }
 
 /**

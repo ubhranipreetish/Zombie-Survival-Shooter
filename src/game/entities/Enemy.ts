@@ -28,6 +28,7 @@ export abstract class Enemy extends GameObject implements IDamageable {
   protected hitFlashTimer: number;
   private wobbleOffset: number;
   private wobbleSpeed: number;
+  protected knockbackVelocity: Vector2D = Vector2D.zero();
 
   constructor(
     x: number,
@@ -48,6 +49,10 @@ export abstract class Enemy extends GameObject implements IDamageable {
     this.hitFlashTimer = 0;
     this.wobbleOffset = Math.random() * Math.PI * 2;
     this.wobbleSpeed = 3 + Math.random() * 2;
+  }
+
+  applyKnockback(push: Vector2D): void {
+    this.knockbackVelocity = this.knockbackVelocity.add(push);
   }
 
   // ----- IDamageable implementation -----
@@ -94,7 +99,17 @@ export abstract class Enemy extends GameObject implements IDamageable {
     // Chase the player
     const toPlayer = this.playerPosition.subtract(this.position).normalize();
     this.velocity = toPlayer.scale(this.speed);
-    this.position = this.position.add(this.velocity.scale(deltaTime));
+    
+    // Combine base chasing velocity with knockback velocity
+    const finalVelocity = this.velocity.add(this.knockbackVelocity);
+    this.position = this.position.add(finalVelocity.scale(deltaTime));
+
+    // Smoothly decay knockback over time (frame-rate independent)
+    const decay = Math.exp(-15 * deltaTime); // fast decay for snappy bounce
+    this.knockbackVelocity = this.knockbackVelocity.scale(decay);
+    if (this.knockbackVelocity.magnitude() < 10) {
+      this.knockbackVelocity = Vector2D.zero();
+    }
 
     // Update hit flash
     if (this.hitFlashTimer > 0) {

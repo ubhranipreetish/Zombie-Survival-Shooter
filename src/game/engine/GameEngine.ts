@@ -97,17 +97,23 @@ export class GameEngine {
       this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score, kills: this.totalKills });
       this.waveManager.onZombieKilled();
 
-      // Random drop: Ammo box (20% chance)
-      if (Math.random() < 0.2) {
-        // Drop 10-20 ammo. The player will get this when they collide with the box.
-        const dropAmount = 10 + Math.floor(Math.random() * 11);
-        this.powerUps.push(new PowerUp(killData.x, killData.y, PowerUpType.AMMO, dropAmount));
+      // Random drop: Ammo box (15% chance)
+      if (Math.random() < 0.15) {
+        const isShotgun = Math.random() < 0.5;
+        const type = isShotgun ? PowerUpType.AMMO_SHOTGUN : PowerUpType.AMMO_RIFLE;
+        const dropAmount = isShotgun ? 5 + Math.floor(Math.random() * 5) : 10 + Math.floor(Math.random() * 11);
+        this.powerUps.push(new PowerUp(killData.x, killData.y, type, dropAmount));
       }
     });
 
     this.eventBus.subscribe(GameEvent.WAVE_COMPLETE, () => {
       this.score += 50;
       this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score });
+
+      // Wave completion rewards: health + ammo
+      this.player.heal(20);
+      this.player.addAmmo('Shotgun', 15);
+      this.player.addAmmo('Rifle', 30);
 
       // Spawn power-ups
       const newPowerUps = this.waveManager.generatePowerUps();
@@ -175,6 +181,13 @@ export class GameEngine {
     this.lastFrameTime = performance.now();
 
     this.setGameState(GameState.PLAYING);
+
+    // Refresh HUD ammo display after card selection
+    this.eventBus.emit(GameEvent.AMMO_CHANGED, {
+      ammo: this.player.getAmmo(),
+      maxAmmo: this.weapons[this.currentWeaponIndex].maxAmmo,
+      weaponName: this.weapons[this.currentWeaponIndex].name,
+    });
   }
 
   getCollectedCards(): PowerUpCard[] {
@@ -220,6 +233,7 @@ export class GameEngine {
       maxAmmo: this.weapons[0].maxAmmo,
       weaponName: this.weapons[0].name,
     });
+    this.eventBus.emit(GameEvent.PLAYER_STATS_CHANGED, this.player.getStats());
 
     this.lastFrameTime = performance.now();
     this.gameLoop(this.lastFrameTime);

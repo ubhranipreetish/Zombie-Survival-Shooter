@@ -181,11 +181,12 @@ export class WaveManager {
     ));
 
     if (this.currentWave % 2 === 0) {
+      const isShotgun = Math.random() < 0.5;
       powerUps.push(new PowerUp(
         randomBetween(margin, this.canvasWidth - margin),
         randomBetween(margin, this.canvasHeight - margin),
-        PowerUpType.AMMO,
-        15,
+        isShotgun ? PowerUpType.AMMO_SHOTGUN : PowerUpType.AMMO_RIFLE,
+        isShotgun ? 10 : 20,
       ));
     }
 

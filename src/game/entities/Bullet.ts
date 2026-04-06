@@ -7,6 +7,8 @@
 import { GameObject } from './GameObject';
 import { Vector2D } from '../utils/Vector2D';
 
+import { Enemy } from './Enemy';
+
 /**
  * A projectile that travels in a straight line and deals damage.
  * Created by weapon strategies, destroyed on collision or leaving canvas.
@@ -19,6 +21,7 @@ export class Bullet extends GameObject {
   private lifetime: number;      // seconds before auto-destroy
   private maxLifetime: number;
   private trail: { x: number; y: number; alpha: number }[];
+  private hitEnemies: Set<Enemy>; // track enemies hit for pierce logic
 
   constructor(
     x: number, y: number,
@@ -36,6 +39,15 @@ export class Bullet extends GameObject {
     this.maxLifetime = 2.0;
     this.lifetime = 0;
     this.trail = [];
+    this.hitEnemies = new Set();
+  }
+
+  hasHit(enemy: Enemy): boolean {
+    return this.hitEnemies.has(enemy);
+  }
+
+  addHit(enemy: Enemy): void {
+    this.hitEnemies.add(enemy);
   }
 
   getDamage(): number {

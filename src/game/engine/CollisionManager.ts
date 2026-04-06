@@ -16,12 +16,15 @@ import { GameEvent, PowerUpType } from '../interfaces/types';
 import { Vector2D } from '../utils/Vector2D';
 
 export class CollisionManager {
-  private eventBus: EventBus;
   private particleSystem: ParticleSystem;
 
   constructor(particleSystem: ParticleSystem) {
-    this.eventBus = EventBus.getInstance();
     this.particleSystem = particleSystem;
+  }
+
+  /** Always get the current EventBus instance (survives resetInstance calls) */
+  private get eventBus(): EventBus {
+    return EventBus.getInstance();
   }
 
   /**
@@ -30,6 +33,8 @@ export class CollisionManager {
    */
   checkBulletEnemyCollisions(bullets: Bullet[], enemies: Enemy[], player: Player): number {
     let kills = 0;
+    // Track how many enemies each bullet has pierced through
+    const bulletPierceHits = new Map<Bullet, number>();
 
     for (const bullet of bullets) {
       if (!bullet.isActive()) continue;
@@ -37,7 +42,12 @@ export class CollisionManager {
       for (const enemy of enemies) {
         if (!enemy.isActive()) continue;
 
+        // Skip if this bullet already hit this enemy
+        if (bullet.hasHit(enemy)) continue;
+
         if (bullet.collidesWith(enemy)) {
+          // Mark as hit
+          bullet.addHit(enemy);
           // Shield zombie — directional damage
           if (enemy instanceof ShieldZombie) {
             (enemy as ShieldZombie).takeDamageFrom(
@@ -48,21 +58,26 @@ export class CollisionManager {
             enemy.takeDamage(bullet.getDamage());
           }
 
-          // Explosive bullets — AoE damage (large radius)
+          // Explosive bullets — AoE damage (scales with explosion level)
           if (player.getHasExplosive()) {
             const pos = bullet.getPosition();
-            const explosionRadius = 120;  // was 60
+            // Start smaller, scale gradually: Lv1=55r/18%, Lv2=70r/26%, Lv3=85r/34%...
+            const explosionRadius = 40 + (player.getExplosionLevel() * 15);
+            const explosionDmgMult = 0.10 + (player.getExplosionLevel() * 0.08);
             for (const other of enemies) {
               if (other === enemy || !other.isActive()) continue;
               if (pos.distanceTo(other.getPosition()) < explosionRadius) {
-                other.takeDamage(bullet.getDamage() * 0.5);
+                other.takeDamage(bullet.getDamage() * explosionDmgMult);
               }
             }
-            this.particleSystem.createExplosion(pos.x, pos.y, '#ff6600', 30, 350);
+            const particleCount = Math.min(50, 15 + player.getExplosionLevel() * 8);
+            this.particleSystem.createExplosion(pos.x, pos.y, '#ff6600', particleCount, 350);
           }
 
-          // Piercing — don't destroy bullet
-          if (!player.getHasPiercing()) {
+          // Piercing — track hits, destroy when exceeded
+          const hits = (bulletPierceHits.get(bullet) ?? 0) + 1;
+          bulletPierceHits.set(bullet, hits);
+          if (hits > player.getPierceCount()) {
             bullet.destroy();
           }
 
@@ -89,7 +104,7 @@ export class CollisionManager {
             });
           }
 
-          if (!player.getHasPiercing()) break;
+          if (!bullet.isActive()) break;
         }
       }
     }
@@ -105,6 +120,21 @@ export class CollisionManager {
       if (!enemy.isActive()) continue;
       if (enemy.collidesWith(player)) {
         player.takeDamage(enemy.getDamage());
+        
+        // Bounce enemy back
+        const p1 = enemy.getPosition();
+        const p2 = player.getPosition();
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 0) {
+          // Instead of an instant 20px teleport, we apply a smooth knockback velocity
+          // ~400px/sec velocity over a few frames creates a very smooth, springy bounce
+          const pushX = (dx / dist) * 400; 
+          const pushY = (dy / dist) * 400;
+          enemy.applyKnockback(new Vector2D(pushX, pushY));
+        }
       }
     }
   }
@@ -133,11 +163,11 @@ export class CollisionManager {
       if (player.collidesWith(powerUp)) {
         if (powerUp.getType() === PowerUpType.HEALTH) {
           player.heal(powerUp.getValue());
-        } else if (powerUp.getType() === PowerUpType.AMMO) {
-          player.addAmmo('Shotgun', Math.floor(powerUp.getValue() / 2));
+        } else if (powerUp.getType() === PowerUpType.AMMO_SHOTGUN) {
+          player.addAmmo('Shotgun', powerUp.getValue());
+        } else if (powerUp.getType() === PowerUpType.AMMO_RIFLE) {
           player.addAmmo('Rifle', powerUp.getValue());
         }
-
         const pos = powerUp.getPosition();
         this.particleSystem.createExplosion(
           pos.x, pos.y,

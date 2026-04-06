@@ -77,7 +77,7 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'piercing',
     name: 'Piercing Rounds',
-    description: 'Bullets pass through enemies',
+    description: '+1 pierce per stack. Bullets pass through more enemies.',
     rarity: CardRarity.RARE,
     effectType: CardEffectType.PIERCING_BULLETS,
     value: 1,
@@ -86,7 +86,7 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'lifesteal',
     name: 'Vampiric Touch',
-    description: 'Heal 5% of damage dealt',
+    description: '+5% lifesteal per stack. Heals on damage dealt.',
     rarity: CardRarity.RARE,
     effectType: CardEffectType.LIFESTEAL,
     value: 0.05,
@@ -95,10 +95,10 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'explosive',
     name: 'Explosive Rounds',
-    description: 'Bullets explode on hit (AoE)',
+    description: 'Bullets explode on hit. Starts weak, stacks up radius & damage.',
     rarity: CardRarity.RARE,
     effectType: CardEffectType.EXPLOSIVE_BULLETS,
-    value: 30,
+    value: 1,
     icon: '💣',
   },
 
@@ -106,28 +106,28 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'double_gun',
     name: 'Dual Wield',
-    description: 'Fire from 2 guns simultaneously',
+    description: 'x2 shots! Fires a second set of bullets per trigger.',
     rarity: CardRarity.EPIC,
     effectType: CardEffectType.DOUBLE_GUN,
-    value: 2,
+    value: 1,
     icon: '🔱',
   },
   {
     id: 'shield_aura',
     name: 'Shield Generator',
-    description: 'Block 1 hit every 8 seconds',
+    description: 'Block 1 hit. -1.5s cooldown per stack (min 3s).',
     rarity: CardRarity.EPIC,
     effectType: CardEffectType.SHIELD_AURA,
-    value: 8,
+    value: 1,
     icon: '🔰',
   },
   {
     id: 'freeze_aura',
     name: 'Cryo Field',
-    description: 'Slow nearby enemies by 40%',
+    description: 'Slow nearby enemies. Starts small, +20 radius & +8% slow per stack.',
     rarity: CardRarity.EPIC,
     effectType: CardEffectType.FREEZE_AURA,
-    value: 0.4,
+    value: 1,
     icon: '❄️',
   },
 
@@ -135,28 +135,28 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'bullet_storm',
     name: 'Bullet Storm',
-    description: 'Fire 3 bullets per shot (stackable!)',
+    description: '+1 extra shot per trigger. Stacks for massive volleys!',
     rarity: CardRarity.LEGENDARY,
     effectType: CardEffectType.BULLET_STORM,
-    value: 3,
+    value: 1,
     icon: '🌪️',
   },
   {
     id: 'auto_explosion',
     name: 'Nova Pulse',
-    description: 'Auto-explode every 5 sec, dealing 50 AOE damage',
+    description: 'Auto-explode every 5s. Starts weak, scales up damage per stack.',
     rarity: CardRarity.LEGENDARY,
     effectType: CardEffectType.AUTO_EXPLOSION,
-    value: 50,
+    value: 1,
     icon: '☢️',
   },
   {
     id: 'orbital_drones',
     name: 'Orbital Strike',
-    description: '3 drones orbit you, damaging enemies on contact',
+    description: '+1 orbiting drone per stack. Damages enemies on contact.',
     rarity: CardRarity.LEGENDARY,
     effectType: CardEffectType.ORBITAL_DRONES,
-    value: 3,
+    value: 1,
     icon: '🛸',
   },
 ];
@@ -296,7 +296,7 @@ export class CardSystem {
     return choices.map((c) => {
       const count = this.getEffectCount(c.effectType);
       if (count > 0) {
-        return { ...c, name: `${c.name} x${count + 1}` };
+        return { ...c, name: `${c.name} Lv.${count + 1}` };
       }
       return c;
     });

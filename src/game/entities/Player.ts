@@ -34,25 +34,24 @@ export class Player extends GameObject implements IDamageable {
   private mousePosition: Vector2D;
   private isFiring: boolean;
 
-  // Card effect modifiers
+  // Card effect modifiers (now stackable/levels)
   private damageMultiplier: number;
   private fireRateMultiplier: number;
-  private hasDoubleGun: boolean;
-  private hasPiercingBullets: boolean;
-  private hasExplosiveBullets: boolean;
+  private extraGunCount: number; // was hasDoubleGun
+  private pierceCount: number; // was hasPiercingBullets
+  private explosionLevel: number; // was hasExplosiveBullets
   private bulletStormCount: number;
   private lifestealPercent: number;
-  private hasShieldAura: boolean;
+  private shieldLevel: number; // scales cooldown
   private shieldCooldown: number;
   private shieldTimer: number;
-  private hasFreezeAura: boolean;
+  private freezeLevel: number; // scales radius and strength
   private freezeRadius: number;
   private freezeStrength: number;
-  private hasAutoExplosion: boolean;
+  private autoExplosionLevel: number; // scales damage
   private autoExplosionTimer: number;
   private autoExplosionDamage: number;
-  private hasOrbitalDrones: boolean;
-  private droneCount: number;
+  private droneCount: number; // was hasOrbitalDrones
   private droneAngle: number;
 
   constructor(
@@ -83,26 +82,56 @@ export class Player extends GameObject implements IDamageable {
     this.ammo.set('Shotgun', 20);
     this.ammo.set('Rifle', 60);
 
-    // Card effects — all start at base values
+    // Card effects — all start at base values (0 or 1)
     this.damageMultiplier = 1;
     this.fireRateMultiplier = 1;
-    this.hasDoubleGun = false;
-    this.hasPiercingBullets = false;
-    this.hasExplosiveBullets = false;
+
+    this.extraGunCount = 0;
+    this.pierceCount = 0;
+    this.explosionLevel = 0;
     this.bulletStormCount = 1;
     this.lifestealPercent = 0;
-    this.hasShieldAura = false;
+
+    this.shieldLevel = 0;
     this.shieldCooldown = 8;
     this.shieldTimer = 0;
-    this.hasFreezeAura = false;
-    this.freezeRadius = 120;
+
+    this.freezeLevel = 0;
+    this.freezeRadius = 0;
     this.freezeStrength = 0;
-    this.hasAutoExplosion = false;
+
+    this.autoExplosionLevel = 0;
     this.autoExplosionTimer = 0;
     this.autoExplosionDamage = 0;
-    this.hasOrbitalDrones = false;
+
     this.droneCount = 0;
     this.droneAngle = 0;
+  }
+
+  getStats(): any {
+    return {
+      damageMultiplier: this.damageMultiplier,
+      fireRateMultiplier: this.fireRateMultiplier,
+      moveSpeed: this.moveSpeed,
+      pierceCount: this.pierceCount,
+      explosionLevel: this.explosionLevel,
+      bulletBlastPercent: this.explosionLevel > 0 ? Math.round((0.1 + this.explosionLevel * 0.08) * 100) : 0,
+      extraGunCount: this.extraGunCount,
+      bulletStormCount: this.bulletStormCount,
+      lifestealPercent: this.lifestealPercent,
+      shieldLevel: this.shieldLevel,
+      shieldCooldown: this.shieldCooldown,
+      freezeLevel: this.freezeLevel,
+      freezeRadius: this.freezeRadius,
+      freezeStrength: this.freezeStrength,
+      autoExplosionLevel: this.autoExplosionLevel,
+      autoExplosionDamage: this.autoExplosionDamage,
+      droneCount: this.droneCount,
+    };
+  }
+
+  private emitStats(): void {
+    EventBus.getInstance().emit(GameEvent.PLAYER_STATS_CHANGED, this.getStats());
   }
 
   // ----- IDamageable -----
@@ -111,7 +140,7 @@ export class Player extends GameObject implements IDamageable {
     if (this.invincibilityTimer > 0) return;
 
     // Shield aura blocks one hit
-    if (this.hasShieldAura && this.shieldTimer <= 0) {
+    if (this.shieldLevel > 0 && this.shieldTimer <= 0) {
       this.shieldTimer = this.shieldCooldown;
       // Shield absorbs the hit
       return;
@@ -245,7 +274,7 @@ export class Player extends GameObject implements IDamageable {
         break;
 
       case CardEffectType.PIERCING_BULLETS:
-        this.hasPiercingBullets = true;
+        this.pierceCount += 1;
         break;
 
       case CardEffectType.LIFESTEAL:
@@ -253,39 +282,44 @@ export class Player extends GameObject implements IDamageable {
         break;
 
       case CardEffectType.EXPLOSIVE_BULLETS:
-        this.hasExplosiveBullets = true;
+        this.explosionLevel += 1;
+        // Explosion damage starts small and scales per level
         break;
 
       case CardEffectType.BULLET_STORM:
-        this.bulletStormCount = card.value;
+        this.bulletStormCount += card.value;
         break;
 
       case CardEffectType.SHIELD_AURA:
-        this.hasShieldAura = true;
+        this.shieldLevel += 1;
+        this.shieldCooldown = Math.max(3, 8 - (this.shieldLevel - 1) * 1.5);
         this.shieldTimer = 0;
         break;
 
       case CardEffectType.FREEZE_AURA:
-        this.hasFreezeAura = true;
-        this.freezeStrength = card.value;
+        this.freezeLevel += 1;
+        // Start small and scale gradually: Lv1=40r/8%, Lv2=60r/16%, Lv3=80r/24%, Lv4=100r/32%, Lv5=120r/40%
+        this.freezeRadius = 20 + (this.freezeLevel * 20);
+        this.freezeStrength = Math.min(0.8, 0.08 * this.freezeLevel);
         break;
 
-      // Legendary — modify character model
-      case CardEffectType.DOUBLE_GUN:
-        this.hasDoubleGun = true;
+      // Legendary
+      case CardEffectType.DOUBLE_GUN: // Actually extra guns multiplier
+        this.extraGunCount += 1;
         break;
 
       case CardEffectType.AUTO_EXPLOSION:
-        this.hasAutoExplosion = true;
-        this.autoExplosionDamage = card.value;
+        this.autoExplosionLevel += 1;
+        // Start weaker, scales up: Lv1=10, Lv2=22, Lv3=36, Lv4=52, Lv5=70
+        this.autoExplosionDamage = 10 + (this.autoExplosionLevel * (this.autoExplosionLevel + 1)) / 2 * 4;
         this.autoExplosionTimer = 0;
         break;
 
       case CardEffectType.ORBITAL_DRONES:
-        this.hasOrbitalDrones = true;
-        this.droneCount = card.value;
+        this.droneCount += card.value;
         break;
     }
+    this.emitStats();
   }
 
   // ----- Effect Getters -----
@@ -295,11 +329,19 @@ export class Player extends GameObject implements IDamageable {
   }
 
   getHasPiercing(): boolean {
-    return this.hasPiercingBullets;
+    return this.pierceCount > 0;
+  }
+
+  getPierceCount(): number {
+    return this.pierceCount;
   }
 
   getHasExplosive(): boolean {
-    return this.hasExplosiveBullets;
+    return this.explosionLevel > 0;
+  }
+
+  getExplosionLevel(): number {
+    return this.explosionLevel;
   }
 
   getLifestealPercent(): number {
@@ -307,7 +349,7 @@ export class Player extends GameObject implements IDamageable {
   }
 
   getHasFreezeAura(): boolean {
-    return this.hasFreezeAura;
+    return this.freezeLevel > 0;
   }
 
   getFreezeRadius(): number {
@@ -319,7 +361,7 @@ export class Player extends GameObject implements IDamageable {
   }
 
   getHasOrbitalDrones(): boolean {
-    return this.hasOrbitalDrones;
+    return this.droneCount > 0;
   }
 
   getDroneCount(): number {
@@ -362,8 +404,8 @@ export class Player extends GameObject implements IDamageable {
       damage: b.damage * this.damageMultiplier,
     }));
 
-    // Double Gun — fire a second set from offset position
-    if (this.hasDoubleGun) {
+    // Double Gun — fire a second set from offset position (scales with extraGunCount)
+    if (this.extraGunCount > 0) {
       const perpendicular = new Vector2D(-aimDir.y, aimDir.x);
       const offset = perpendicular.scale(12);
       const secondBullets = this.weapon.fire(
@@ -421,17 +463,17 @@ export class Player extends GameObject implements IDamageable {
     }
 
     // Shield cooldown
-    if (this.hasShieldAura && this.shieldTimer > 0) {
+    if (this.shieldLevel > 0 && this.shieldTimer > 0) {
       this.shieldTimer -= deltaTime;
     }
 
     // Auto explosion timer
-    if (this.hasAutoExplosion) {
+    if (this.autoExplosionLevel > 0) {
       this.autoExplosionTimer += deltaTime;
     }
 
     // Drone rotation
-    if (this.hasOrbitalDrones) {
+    if (this.droneCount > 0) {
       this.droneAngle += deltaTime * 2.5;
     }
   }
@@ -441,7 +483,7 @@ export class Player extends GameObject implements IDamageable {
    * Returns damage if ready, 0 otherwise.
    */
   consumeAutoExplosion(): number {
-    if (!this.hasAutoExplosion) return 0;
+    if (this.autoExplosionLevel <= 0) return 0;
     if (this.autoExplosionTimer >= 5.0) {
       this.autoExplosionTimer = 0;
       return this.autoExplosionDamage;
@@ -461,7 +503,7 @@ export class Player extends GameObject implements IDamageable {
     }
 
     // Freeze aura
-    if (this.hasFreezeAura) {
+    if (this.freezeLevel > 0) {
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, this.freezeRadius);
       gradient.addColorStop(0, 'rgba(100, 200, 255, 0.05)');
       gradient.addColorStop(0.7, 'rgba(100, 200, 255, 0.03)');
@@ -481,7 +523,7 @@ export class Player extends GameObject implements IDamageable {
     }
 
     // Auto explosion charging indicator
-    if (this.hasAutoExplosion) {
+    if (this.autoExplosionLevel > 0) {
       const chargePercent = Math.min(1, this.autoExplosionTimer / 5.0);
       ctx.strokeStyle = `rgba(255, 100, 0, ${chargePercent * 0.5})`;
       ctx.lineWidth = 2;
@@ -506,7 +548,7 @@ export class Player extends GameObject implements IDamageable {
     ctx.fill();
 
     // Shield aura visual
-    if (this.hasShieldAura) {
+    if (this.shieldLevel > 0) {
       const shieldReady = this.shieldTimer <= 0;
       ctx.strokeStyle = shieldReady
         ? 'rgba(0, 229, 255, 0.5)'
@@ -558,7 +600,7 @@ export class Player extends GameObject implements IDamageable {
     // Gun barrel(s)
     const barrelLength = this.size + 12;
 
-    if (this.hasDoubleGun) {
+    if (this.extraGunCount > 0) {
       // Double gun — two barrels offset to either side
       const perpDir = new Vector2D(-Math.sin(this.aimAngle), Math.cos(this.aimAngle));
       const offset = 6;
@@ -608,7 +650,7 @@ export class Player extends GameObject implements IDamageable {
     }
 
     // Orbital drones
-    if (this.hasOrbitalDrones) {
+    if (this.droneCount > 0) {
       const droneRadius = this.size * 2.5;
       for (let i = 0; i < this.droneCount; i++) {
         const angle = this.droneAngle + (i / this.droneCount) * Math.PI * 2;
