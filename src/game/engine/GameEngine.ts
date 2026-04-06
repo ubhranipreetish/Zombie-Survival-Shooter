@@ -422,7 +422,7 @@ export class GameEngine {
     // Player firing
     const bulletConfigs = this.player.tryFire(currentTime);
     if (bulletConfigs) {
-      AudioSystem.getInstance().playShoot(this.weapons[this.currentWeaponIndex].constructor.name);
+      AudioSystem.getInstance().playShoot(this.weapons[this.currentWeaponIndex].name);
       for (const config of bulletConfigs) {
         this.bullets.push(
           new Bullet(

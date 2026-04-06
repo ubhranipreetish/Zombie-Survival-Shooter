@@ -81,13 +81,14 @@ export class AudioSystem {
     }
   }
 
-  private playBuffer(name: string, volume: number = 1.0): boolean {
+  private playBuffer(name: string, volume: number = 1.0, playbackRate: number = 1.0): boolean {
     if (!this.enabled || !this.ctx || !this.masterGain) return false;
     const buffer = this.buffers.get(name);
     if (!buffer) return false;
 
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
+    source.playbackRate.value = playbackRate;
 
     if (volume !== 1.0) {
       const tempGain = this.ctx.createGain();
@@ -142,12 +143,12 @@ export class AudioSystem {
   }
 
   playShoot(weaponName: string = 'Pistol'): void {
-    if (weaponName === 'Shotgun' && this.playBuffer('shotgun')) return;
-    if (weaponName === 'Rifle' && this.playBuffer('rifle')) return;
+    if (weaponName === 'Shotgun' && this.playBuffer('shotgun', 1.3, 0.75)) return;
+    if (weaponName === 'Rifle' && this.playBuffer('rifle', 1.0, 1.4)) return;
     if (weaponName === 'Crossbow' && this.playBuffer('crossbow')) return;
     if (weaponName === 'LaserRifle' && this.playBuffer('lazer')) return;
     if (weaponName === 'Flamethrower' && this.playBuffer('flamethrower', 2.0)) return;
-    if ((weaponName === 'Pistol' || !['LaserRifle', 'Crossbow', 'Flamethrower'].includes(weaponName)) && this.playBuffer('pistol')) return;
+    if (weaponName === 'Pistol' && this.playBuffer('pistol')) return;
 
     // Fallbacks
     if (!this.enabled || !this.ctx || !this.masterGain) return;
