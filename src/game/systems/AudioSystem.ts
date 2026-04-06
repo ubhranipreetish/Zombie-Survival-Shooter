@@ -11,7 +11,7 @@ export class AudioSystem {
   private bgmSource: AudioBufferSourceNode | null = null;
   private needsBGM: boolean = false;
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): AudioSystem {
     if (!AudioSystem.instance) AudioSystem.instance = new AudioSystem();
@@ -85,10 +85,10 @@ export class AudioSystem {
     if (!this.enabled || !this.ctx || !this.masterGain) return false;
     const buffer = this.buffers.get(name);
     if (!buffer) return false;
-    
+
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
-    
+
     if (volume !== 1.0) {
       const tempGain = this.ctx.createGain();
       tempGain.gain.value = volume;
@@ -97,7 +97,7 @@ export class AudioSystem {
     } else {
       source.connect(this.masterGain);
     }
-    
+
     source.start(0);
     return true;
   }
@@ -118,10 +118,10 @@ export class AudioSystem {
     this.bgmSource = this.ctx.createBufferSource();
     this.bgmSource.buffer = buffer;
     this.bgmSource.loop = true;
-    
+
     const bgmGain = this.ctx.createGain();
     bgmGain.gain.value = 0.5; // 50% volume
-    
+
     this.bgmSource.connect(bgmGain);
     bgmGain.connect(this.masterGain);
     this.bgmSource.start(0);
@@ -148,11 +148,11 @@ export class AudioSystem {
     if (weaponName === 'LaserRifle' && this.playBuffer('lazer')) return;
     if (weaponName === 'Flamethrower' && this.playBuffer('flamethrower', 2.0)) return;
     if ((weaponName === 'Pistol' || !['LaserRifle', 'Crossbow', 'Flamethrower'].includes(weaponName)) && this.playBuffer('pistol')) return;
-    
+
     // Fallbacks
     if (!this.enabled || !this.ctx || !this.masterGain) return;
     const t = this.ctx.currentTime;
-    
+
     if (weaponName === 'Shotgun') {
       this.playNoise(0.2, 0.4, 800, 'lowpass');
     } else if (weaponName === 'Rifle') {
