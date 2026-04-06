@@ -18,6 +18,8 @@ export interface BulletConfig {
   damage: number;
   size: number;
   color: string;
+  bounces?: number;
+  isCrit?: boolean;
 }
 
 /**

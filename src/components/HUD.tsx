@@ -179,6 +179,17 @@ export default function HUD() {
 
   return (
     <div id="game-hud" className="hud-container">
+      {/* Low Health Screen Tint */}
+      {healthPercent < 25 && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          boxShadow: 'inset 0 0 150px rgba(255, 0, 0, 0.6)',
+          pointerEvents: 'none', zIndex: 1000,
+          animation: 'pulse-alpha 1s infinite alternate'
+        }}>
+           <style>{`@keyframes pulse-alpha { from { opacity: 0.6; } to { opacity: 1; } }`}</style>
+        </div>
+      )}
 
       {/* Boss Health Bar — top center */}
       {boss && (

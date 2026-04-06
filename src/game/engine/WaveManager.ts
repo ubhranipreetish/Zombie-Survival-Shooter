@@ -61,6 +61,7 @@ export class WaveManager {
       spawnInterval: Math.max(200, 900 - wave * 60),
       healthMultiplier: 1 + (wave - 1) * 0.10, // Reduced from 0.20 down to 0.10
       speedMultiplier: 1 + (wave - 1) * 0.08,
+      damageMultiplier: 1 + (wave - 1) * 0.15,
     };
   }
 
@@ -131,6 +132,7 @@ export class WaveManager {
         this.canvasWidth,
         this.canvasHeight,
       );
+      boss.setDamageMultiplier(this.waveConfig.damageMultiplier);
       newEnemies.push(boss);
     }
 
@@ -162,6 +164,8 @@ export class WaveManager {
         this.canvasWidth,
         this.canvasHeight,
       );
+      
+      enemy.setDamageMultiplier(this.waveConfig.damageMultiplier);
 
       newEnemies.push(enemy);
       this.enemiesSpawned++;

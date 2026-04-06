@@ -156,6 +156,7 @@ export interface WaveConfig {
   spawnInterval: number;
   healthMultiplier: number;
   speedMultiplier: number;
+  damageMultiplier: number;
 }
 
 /**

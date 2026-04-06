@@ -4,6 +4,7 @@
 // ============================================================
 
 import { Vector2D } from '../utils/Vector2D';
+import { AudioSystem } from '../systems/AudioSystem';
 
 /**
  * Manages keyboard and mouse input state.
@@ -55,6 +56,7 @@ export class InputManager {
 
   private onKeyDown = (e: KeyboardEvent): void => {
     this.keys.add(e.key);
+    AudioSystem.getInstance().init();
   };
 
   private onKeyUp = (e: KeyboardEvent): void => {
@@ -84,6 +86,7 @@ export class InputManager {
   private onMouseDown = (e: MouseEvent): void => {
     if (e.button === 0) { // left click only
       this.mouseDown = true;
+      AudioSystem.getInstance().init();
     }
   };
 

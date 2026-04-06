@@ -120,7 +120,10 @@ export class HydraBoss extends Enemy {
       name: 'HYDRA',
       health: this.health,
       maxHealth: this.maxHealth,
-      color: '#00bfa5',
+      color: '#66bb6a',
+      skullThresholds: this.skullThresholds,
+      skullsTriggered: this.skullsTriggered,
+      isInvincible: this.bossInvincibilityTimer > 0,
     });
   }
 

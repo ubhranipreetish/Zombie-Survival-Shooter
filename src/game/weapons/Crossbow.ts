@@ -14,7 +14,7 @@ import { Vector2D } from '../utils/Vector2D';
  */
 export class Crossbow implements IWeaponStrategy {
   readonly name = 'Crossbow';
-  readonly fireRate = 0.8;      // 0.8 shots per second (very slow)
+  readonly fireRate = 2.0;      // 2.0 shots per second (much faster reload!)
   readonly damage = 80;         // massive per bolt
   readonly maxAmmo = 40;
   readonly color = '#8d6e63';   // brown/gold
@@ -29,6 +29,7 @@ export class Crossbow implements IWeaponStrategy {
       damage: this.damage,
       size: 5,
       color: '#8d6e63',
+      bounces: 5,
     }];
   }
 

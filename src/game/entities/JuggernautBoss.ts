@@ -143,6 +143,9 @@ export class JuggernautBoss extends Enemy {
       health: this.health,
       maxHealth: this.maxHealth,
       color: '#d32f2f',
+      skullThresholds: this.skullThresholds,
+      skullsTriggered: this.skullsTriggered,
+      isInvincible: this.bossInvincibilityTimer > 0,
     });
   }
 

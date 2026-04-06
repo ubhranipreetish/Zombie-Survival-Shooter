@@ -12,6 +12,7 @@ import { PowerUp } from '../entities/PowerUp';
 import { ExpOrb } from '../entities/ExpOrb';
 import { EnemyBullet } from '../entities/EnemyBullet';
 import { NormalZombie } from '../entities/NormalZombie';
+import { AudioSystem } from '../systems/AudioSystem';
 import { Pistol } from '../weapons/Pistol';
 import { Shotgun } from '../weapons/Shotgun';
 import { Rifle } from '../weapons/Rifle';
@@ -107,11 +108,13 @@ export class GameEngine {
     this.pendingCardChoices = [];
 
     this.setupEventListeners();
+    AudioSystem.getInstance().init(); // eagerly fetches HTTP MP3 payloads into ArrayBuffer context cache
   }
 
   private setupEventListeners(): void {
     this.eventBus.subscribe(GameEvent.ZOMBIE_KILLED, (data: unknown) => {
-      const killData = data as { score: number; x: number; y: number; weaponName?: string; exp?: number };
+      const killData = data as { type: ZombieType; score: number; exp: number; x: number; y: number };
+      AudioSystem.getInstance().playEnemyDying();
       this.score += killData.score;
       this.totalKills++;
       this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score, kills: this.totalKills });
@@ -147,10 +150,17 @@ export class GameEngine {
       this.player.addAmmoPercent('Shotgun', ammoPct);
       this.player.addAmmoPercent('Rifle', ammoPct);
       if (this.player.isFlamethrowerUnlocked()) {
-        this.player.addAmmoPercent('Flamethrower', ammoPct);
+        const ftBonus = Math.floor(30 * (1 + this.player.getPostRoundAmmoBonus()));
+        this.player.addAmmo('Flamethrower', ftBonus);
       }
-      if (this.player.isLaserRifleUnlocked()) this.player.addAmmoPercent('LaserRifle', ammoPct);
-      if (this.player.isCrossbowUnlocked()) this.player.addAmmoPercent('Crossbow', ammoPct);
+      if (this.player.isLaserRifleUnlocked()) {
+        const lrBonus = Math.floor(100 * (1 + this.player.getPostRoundAmmoBonus()));
+        this.player.addAmmo('LaserRifle', lrBonus);
+      }
+      if (this.player.isCrossbowUnlocked()) {
+        const cbBonus = Math.floor(3 * (1 + this.player.getPostRoundAmmoBonus()));
+        this.player.addAmmo('Crossbow', cbBonus);
+      }
 
       // Spawn power-ups
       const newPowerUps = this.waveManager.generatePowerUps();
@@ -165,8 +175,9 @@ export class GameEngine {
     this.eventBus.subscribe(GameEvent.WAVE_CHANGED, () => {
     });
 
-    // Enemy shooting — ShooterZombie fires via event
+    // Enemies shooting (e.g. ShooterZombie)
     this.eventBus.subscribe(GameEvent.ENEMY_SHOOT, (data: unknown) => {
+      AudioSystem.getInstance().playEnemyShoot();
       const d = data as { x: number; y: number; dirX: number; dirY: number; speed: number; damage: number; radius?: number; isSlam?: boolean };
       // Fallback for 0,0 direction vector causing NaN on normalize
       const dirX = d.dirX === 0 && d.dirY === 0 ? 1 : d.dirX;
@@ -244,6 +255,7 @@ export class GameEngine {
   }
 
   startGame(): void {
+    AudioSystem.getInstance().startBGM(); // User gesture un-suspends Audio Context here
     this.score = 0;
     this.totalKills = 0;
     this.enemies = [];
@@ -410,6 +422,7 @@ export class GameEngine {
     // Player firing
     const bulletConfigs = this.player.tryFire(currentTime);
     if (bulletConfigs) {
+      AudioSystem.getInstance().playShoot(this.weapons[this.currentWeaponIndex].constructor.name);
       for (const config of bulletConfigs) {
         this.bullets.push(
           new Bullet(
@@ -417,6 +430,9 @@ export class GameEngine {
             config.dirX, config.dirY,
             config.speed, config.damage,
             config.size, config.color,
+            config.bounces || 0,
+            config.isCrit || false,
+            this.canvas.width, this.canvas.height
           ),
         );
       }
@@ -516,6 +532,7 @@ export class GameEngine {
 
     // Level-up: pause to show banner, then open card selection
     if (this.expSystem.consumeLevelUp()) {
+      AudioSystem.getInstance().playLevelUp();
       const cards = this.cardSystem.generateCardChoices(this.waveManager.getCurrentWave());
       this.pendingCardChoices = cards;
       this.inputManager.clearInputs();
@@ -558,6 +575,7 @@ export class GameEngine {
       if (this.player.collidesWith(orb)) {
         this.expSystem.addExp(orb.getExpValue());
         this.particleSystem.createExplosion(orb.getPosition().x, orb.getPosition().y, '#29b6f6', 5, 80);
+        AudioSystem.getInstance().playPowerup();
         orb.destroy();
       }
     }
@@ -627,6 +645,32 @@ export class GameEngine {
       this.renderer.renderObjects(this.expOrbs);
       this.renderer.renderObjects(this.grenades);
       this.renderer.renderObjects(this.enemies);
+      
+      const ctx = this.renderer.getContext();
+      for (const enemy of this.enemies) {
+         if (enemy.getIsBoss() && enemy.isBossInvincible()) {
+             const x = enemy.getPosition().x;
+             const y = enemy.getPosition().y;
+             const r = enemy.getSize() + 20;
+             
+             ctx.save();
+             // Golden rotating dashed shield
+             ctx.strokeStyle = '#ffd700';
+             ctx.lineWidth = 6;
+             ctx.setLineDash([15, 10]);
+             ctx.lineDashOffset = -performance.now() / 20;
+             ctx.beginPath();
+             ctx.arc(x, y, r, 0, Math.PI * 2);
+             ctx.stroke();
+             
+             // Inner glow
+             ctx.fillStyle = 'rgba(255, 215, 0, 0.25)';
+             ctx.beginPath();
+             ctx.arc(x, y, r, 0, Math.PI * 2);
+             ctx.fill();
+             ctx.restore();
+         }
+      }
       this.renderer.renderObjects(this.bullets);
       this.renderer.renderObjects(this.enemyBullets);
       this.renderer.renderObjects([this.player]);
@@ -644,6 +688,7 @@ export class GameEngine {
       wave: this.waveManager.getCurrentWave(),
       zombiesKilled: this.waveManager.getTotalZombiesKilled(),
     };
+    AudioSystem.getInstance().stopBGM();
     this.setGameState(GameState.GAME_OVER);
     this.eventBus.emit(GameEvent.GAME_OVER, data);
   }

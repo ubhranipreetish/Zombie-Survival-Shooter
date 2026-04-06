@@ -40,7 +40,7 @@ export class EnemyBullet extends GameObject {
   update(deltaTime: number): void {
     if (this.isSlam) {
         this.lifetime += deltaTime;
-        if (this.lifetime > 0.3) this.destroy();
+        if (this.lifetime > 0.05) this.destroy();
         return;
     }
 

@@ -103,6 +103,7 @@ export class WardenBoss extends Enemy {
 
   getIsLaserFiring(): boolean { return this.isLaserFiring; }
   getLaserAngle(): number { return this.laserAngle; }
+  getShieldAngle(): number { return this.shieldAngle; }
 
   private emitHealthUpdate(): void {
     EventBus.getInstance().emit(GameEvent.BOSS_HEALTH_CHANGED, {
@@ -110,6 +111,9 @@ export class WardenBoss extends Enemy {
       health: this.health,
       maxHealth: this.maxHealth,
       color: '#546e7a',
+      skullThresholds: this.skullThresholds,
+      skullsTriggered: this.skullsTriggered,
+      isInvincible: this.bossInvincibilityTimer > 0,
     });
   }
 

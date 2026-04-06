@@ -741,12 +741,21 @@ export class Player extends GameObject implements IDamageable {
         ctx.fill();
       }
     } else {
-      // Single barrel
-      const barrelEndX = x + Math.cos(this.aimAngle) * barrelLength;
-      const barrelEndY = y + Math.sin(this.aimAngle) * barrelLength;
+      // Single barrel dynamic types
+      let wColor = '#b0bec5'; let wWidth = 4; let wLen = this.size + 12; let nozzle = '#78909c';
+      switch(this.weapon.name) {
+          case 'Shotgun': wColor = '#424242'; wWidth = 8; wLen = this.size + 16; nozzle = '#212121'; break;
+          case 'Rifle': wColor = '#212121'; wWidth = 5; wLen = this.size + 24; nozzle = '#000000'; break;
+          case 'Flamethrower': wColor = '#ff5722'; wWidth = 10; wLen = this.size + 18; nozzle = '#d50000'; break;
+          case 'LaserRifle': wColor = '#00e5ff'; wWidth = 6; wLen = this.size + 25; nozzle = '#ffffff'; break;
+          case 'Crossbow': wColor = '#795548'; wWidth = 5; wLen = this.size + 14; nozzle = '#5d4037'; break;
+      }
+      
+      const barrelEndX = x + Math.cos(this.aimAngle) * wLen;
+      const barrelEndY = y + Math.sin(this.aimAngle) * wLen;
 
-      ctx.strokeStyle = '#b0bec5';
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = wColor;
+      ctx.lineWidth = wWidth;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(
@@ -756,10 +765,19 @@ export class Player extends GameObject implements IDamageable {
       ctx.lineTo(barrelEndX, barrelEndY);
       ctx.stroke();
 
-      ctx.fillStyle = '#78909c';
-      ctx.beginPath();
-      ctx.arc(barrelEndX, barrelEndY, 3, 0, Math.PI * 2);
-      ctx.fill();
+      if (this.weapon.name === 'Crossbow') {
+          const perpDir = new Vector2D(-Math.sin(this.aimAngle), Math.cos(this.aimAngle));
+          ctx.beginPath();
+          ctx.moveTo(barrelEndX + perpDir.x * 12, barrelEndY + perpDir.y * 12);
+          const bowOffset = 6;
+          ctx.bezierCurveTo(barrelEndX - Math.cos(this.aimAngle)*bowOffset, barrelEndY - Math.sin(this.aimAngle)*bowOffset, barrelEndX - Math.cos(this.aimAngle)*bowOffset, barrelEndY - Math.sin(this.aimAngle)*bowOffset, barrelEndX - perpDir.x * 12, barrelEndY - perpDir.y * 12);
+          ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 3; ctx.stroke();
+      } else {
+        ctx.fillStyle = nozzle;
+        ctx.beginPath();
+        ctx.arc(barrelEndX, barrelEndY, wWidth/1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Orbital drones

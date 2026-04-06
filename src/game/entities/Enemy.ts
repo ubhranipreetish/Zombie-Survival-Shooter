@@ -61,6 +61,10 @@ export abstract class Enemy extends GameObject implements IDamageable {
     this.knockbackVelocity = this.knockbackVelocity.add(push);
   }
 
+  setDamageMultiplier(mult: number): void {
+    this.damage *= mult;
+  }
+
   // ----- IDamageable implementation -----
 
   takeDamage(amount: number): void {

@@ -12,8 +12,13 @@ export class ExpSystem {
   private pendingLevelUps: number = 0;
 
   getExpForLevel(level: number): number {
-    // Level 1→2: 70, then *1.25 each level: 88, 110, 137, 171...
-    return Math.floor(70 * Math.pow(1.25, level - 1));
+    // Level 1→10 scales exponentially
+    if (level <= 10) {
+      return Math.floor(70 * Math.pow(1.25, level - 1));
+    }
+    // After level 10, scale linearly to prevent impossible grind
+    const expAt10 = Math.floor(70 * Math.pow(1.25, 9)); 
+    return expAt10 + (level - 10) * 150;
   }
 
   getExp(): number { return this.exp; }

@@ -26,6 +26,7 @@ export class Bullet extends GameObject {
   private bouncesRemaining: number;  // bouncing bullets ability
   private canvasWidth: number;
   private canvasHeight: number;
+  private critFlag: boolean;
 
   constructor(
     x: number, y: number,
@@ -35,6 +36,7 @@ export class Bullet extends GameObject {
     size: number = 3,
     color: string = '#ffdd00',
     bounces: number = 0,
+    isCrit: boolean = false,
     canvasWidth: number = 1920,
     canvasHeight: number = 1080,
   ) {
@@ -49,9 +51,12 @@ export class Bullet extends GameObject {
     this.hitEnemies = new Set();
     this.totalHits = 0;
     this.bouncesRemaining = bounces;
+    this.critFlag = isCrit;
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
   }
+
+  isCrit(): boolean { return this.critFlag; }
 
   hasHit(enemy: Enemy): boolean {
     return this.hitEnemies.has(enemy);
@@ -101,6 +106,11 @@ export class Bullet extends GameObject {
     const moveAmount = this.direction.scale(this.speed * deltaTime);
     this.position = this.position.add(moveAmount);
 
+    // Bouncing ability timeout protection
+    if (this.bouncesRemaining > 0 && this.lifetime > this.maxLifetime - 0.2) {
+       this.maxLifetime = this.lifetime + 2.0; // Extend duration if still bouncing!
+    }
+
     // Bounce off canvas edges
     if (this.bouncesRemaining > 0) {
       let dx = this.direction.x;
@@ -127,6 +137,11 @@ export class Bullet extends GameObject {
     if (this.lifetime >= this.maxLifetime) {
       this.destroy();
     }
+  }
+
+  bounce(newDirection: Vector2D): void {
+    this.direction = newDirection;
+    this.bouncesRemaining--;
   }
 
   render(ctx: CanvasRenderingContext2D): void {

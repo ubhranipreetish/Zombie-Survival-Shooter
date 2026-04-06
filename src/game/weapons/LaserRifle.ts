@@ -14,28 +14,28 @@ import { Vector2D } from '../utils/Vector2D';
  */
 export class LaserRifle implements IWeaponStrategy {
   readonly name = 'LaserRifle';
-  readonly fireRate = 8;        // 8 shots per second
-  readonly damage = 12;         // per beam
-  readonly maxAmmo = 150;
+  readonly fireRate = 50;       // 50 shots per second! Literally a line!
+  readonly damage = 3;          // very low per hit, since it hits constantly
+  readonly maxAmmo = 500;
   readonly color = '#00e5ff';   // cyan
 
   fire(origin: Vector2D, direction: Vector2D): BulletConfig[] {
     const bullets: BulletConfig[] = [];
     const perpendicular = new Vector2D(-direction.y, direction.x);
-    const offset = 5; // parallel beam spacing
+    const offset = 2; // parallel beam spacing very tight
 
     for (const side of [-1, 1]) {
-      const ox = origin.x + perpendicular.x * offset * side + direction.x * 18;
-      const oy = origin.y + perpendicular.y * offset * side + direction.y * 18;
+      const ox = origin.x + perpendicular.x * offset * side + direction.x * 12;
+      const oy = origin.y + perpendicular.y * offset * side + direction.y * 12;
 
       bullets.push({
         x: ox,
         y: oy,
         dirX: direction.x,
         dirY: direction.y,
-        speed: 900,
+        speed: 2500, // lightning fast!
         damage: this.damage,
-        size: 2,
+        size: 1.5,
         color: '#00e5ff',
       });
     }

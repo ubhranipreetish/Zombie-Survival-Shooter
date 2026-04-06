@@ -23,7 +23,7 @@ export class NecromancerBoss extends Enemy {
   constructor(x: number, y: number, healthMultiplier: number, _speedMultiplier: number, canvasW: number, canvasH: number) {
     super(
       x, y,
-      28,
+      22,
       600 * healthMultiplier,
       40,
       20,
@@ -96,7 +96,10 @@ export class NecromancerBoss extends Enemy {
       name: 'NECROMANCER',
       health: this.health,
       maxHealth: this.maxHealth,
-      color: '#9c27b0',
+      color: '#ab47bc',
+      skullThresholds: this.skullThresholds,
+      skullsTriggered: this.skullsTriggered,
+      isInvincible: this.bossInvincibilityTimer > 0,
     });
   }
 

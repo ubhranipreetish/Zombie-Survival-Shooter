@@ -10,9 +10,10 @@ import { Bullet } from '../entities/Bullet';
 import { PowerUp } from '../entities/PowerUp';
 import { EnemyBullet } from '../entities/EnemyBullet';
 import { ShieldZombie } from '../entities/ShieldZombie';
+import { WardenBoss } from '../entities/WardenBoss';
 import { ParticleSystem } from '../particles/ParticleSystem';
 import { EventBus } from '../events/EventBus';
-import { GameEvent, PowerUpType } from '../interfaces/types';
+import { GameEvent, PowerUpType, ZombieType } from '../interfaces/types';
 import { Vector2D } from '../utils/Vector2D';
 
 export class CollisionManager {
@@ -44,6 +45,39 @@ export class CollisionManager {
         if (bullet.hasHit(enemy)) continue;
 
         if (bullet.collidesWith(enemy)) {
+          // Warden shield blocking
+          if (enemy.getType() === ZombieType.BOSS_WARDEN) {
+            const warden = enemy as unknown as WardenBoss;
+            let hitShield = false;
+            // Shield parameters copied from WardenBoss: 4 shields, size*2.2 distance
+            const count = 4; 
+            const dist = enemy.getSize() * 2.2;
+            // The shield angle is exposed via warden.getShieldAngle() but wait... 
+            // Better to just calculate collision using the exact same logic.
+            // But since WardenBoss doesn't expose getShieldAngle, I'll temporarily bypass it 
+            // or just use generic shield bounding. Actually the user specifically said "warden shields don't block".
+            // Since WardenBoss doesn't expose it, I will skip it here and just do generic. No, I MUST block it. 
+            // I will add getShieldAngle() to WardenBoss and then patch it.
+            // For now assume getShieldAngle exists.
+            if ((warden as any).getShieldAngle !== undefined) {
+              const baseAngle = (warden as any).getShieldAngle();
+              for (let i = 0; i < count; i++) {
+                const angle = baseAngle + (i / count) * Math.PI * 2;
+                const sx = warden.getPosition().x + Math.cos(angle) * dist;
+                const sy = warden.getPosition().y + Math.sin(angle) * dist;
+                if (bullet.getPosition().distanceTo(new Vector2D(sx, sy)) < 25) {
+                  hitShield = true;
+                  break;
+                }
+              }
+            }
+            if (hitShield) {
+              bullet.destroy();
+              this.particleSystem.createImpact(bullet.getPosition().x, bullet.getPosition().y, '#90a4ae');
+              continue;
+            }
+          }
+
           // Mark as hit
           bullet.addHit(enemy);
           // Shield zombie — directional damage
@@ -81,6 +115,24 @@ export class CollisionManager {
             player.heal(1);
           }
 
+          // Bouncing logic between enemies
+          if (bullet.isBouncing()) {
+             let closestDist = Infinity;
+             let closestEnemy: Enemy | null = null;
+             for (const other of enemies) {
+               if (other === enemy || !other.isActive() || bullet.hasHit(other)) continue;
+               const dist = bullet.getPosition().distanceTo(other.getPosition());
+               if (dist < closestDist) {
+                 closestDist = dist;
+                 closestEnemy = other;
+               }
+             }
+             if (closestEnemy) {
+               const dir = closestEnemy.getPosition().subtract(bullet.getPosition()).normalize();
+               bullet.bounce(dir);
+             }
+          }
+
           // Kill logic
           if (!enemy.isAlive()) {
             kills++;
@@ -98,7 +150,7 @@ export class CollisionManager {
 
           // Piercing — destroy when exceeded
           // The bullet's addHit(enemy) already incremented its internal hit count
-          if (bullet.getHitCount() > player.getPierceCount()) {
+          if (!bullet.isBouncing() && bullet.getHitCount() > player.getPierceCount()) {
             bullet.destroy();
             break; // Stop hitting other enemies in the same frame
           }
@@ -133,6 +185,28 @@ export class CollisionManager {
           const pushX = (dx / dist) * 400; 
           const pushY = (dy / dist) * 400;
           enemy.applyKnockback(new Vector2D(pushX, pushY));
+        }
+      }
+
+      // Warden laser interaction
+      if (enemy.getType() === ZombieType.BOSS_WARDEN) {
+        const warden = enemy as unknown as WardenBoss;
+        if ((warden as any).getIsLaserFiring !== undefined && (warden as any).getIsLaserFiring()) {
+          const laserAngle = (warden as any).getLaserAngle();
+          const laserLen = 500;
+          const p1 = warden.getPosition();
+          const p2 = new Vector2D(p1.x + Math.cos(laserAngle) * laserLen, p1.y + Math.sin(laserAngle) * laserLen);
+
+          // Distance from player to line segment
+          const l2 = p1.distanceTo(p2) * p1.distanceTo(p2);
+          if (l2 > 0) {
+            const t = Math.max(0, Math.min(1, ((player.getPosition().x - p1.x) * (p2.x - p1.x) + (player.getPosition().y - p1.y) * (p2.y - p1.y)) / l2));
+            const projection = new Vector2D(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y));
+            if (projection.distanceTo(player.getPosition()) < player.getSize() + 15) {
+               // Player is touching the laser!
+               player.takeDamage(enemy.getDamage() * 0.1); // Constant damage while standing in beam
+            }
+          }
         }
       }
     }

@@ -128,6 +128,9 @@ export class PhantomBoss extends Enemy {
       health: this.health,
       maxHealth: this.maxHealth,
       color: '#7e57c2',
+      skullThresholds: this.skullThresholds,
+      skullsTriggered: this.skullsTriggered,
+      isInvincible: this.bossInvincibilityTimer > 0,
     });
   }
 
