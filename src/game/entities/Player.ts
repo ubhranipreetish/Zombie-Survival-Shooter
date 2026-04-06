@@ -170,6 +170,15 @@ export class Player extends GameObject implements IDamageable {
     const current = this.ammo.get(weaponName) ?? 0;
     if (current === Infinity) return;
     this.ammo.set(weaponName, current + amount);
+
+    // If we just added ammo to the currently equipped weapon, update the HUD
+    if (this.weapon.name === weaponName) {
+      EventBus.getInstance().emit(GameEvent.AMMO_CHANGED, {
+        ammo: this.ammo.get(weaponName),
+        maxAmmo: this.weapon.maxAmmo,
+        weaponName: this.weapon.name,
+      });
+    }
   }
 
   // ----- Input Setters -----

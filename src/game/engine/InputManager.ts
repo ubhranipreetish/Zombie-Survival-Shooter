@@ -38,6 +38,12 @@ export class InputManager {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
 
+    // If the window loses focus (alt-tab, devtools click, etc.) the browser
+    // suppresses the keyup event, leaving keys stuck in the Set and causing
+    // the player to keep drifting forever.  Clearing on blur/visibility fixes this.
+    window.addEventListener('blur', this.onWindowBlur);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+
     // Mouse
     this.canvas.addEventListener('mousemove', this.onMouseMove);
     this.canvas.addEventListener('mousedown', this.onMouseDown);
@@ -53,6 +59,18 @@ export class InputManager {
 
   private onKeyUp = (e: KeyboardEvent): void => {
     this.keys.delete(e.key);
+  };
+
+  /** Clear all input when the window loses focus to avoid stuck keys. */
+  private onWindowBlur = (): void => {
+    this.clearInputs();
+  };
+
+  /** Clear all input when the tab is hidden (e.g. switching tabs). */
+  private onVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') {
+      this.clearInputs();
+    }
   };
 
   private onMouseMove = (e: MouseEvent): void => {
@@ -131,6 +149,8 @@ export class InputManager {
   destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onWindowBlur);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
     this.canvas.removeEventListener('mousemove', this.onMouseMove);
     this.canvas.removeEventListener('mousedown', this.onMouseDown);
     this.canvas.removeEventListener('mouseup', this.onMouseUp);

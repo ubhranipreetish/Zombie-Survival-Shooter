@@ -4,7 +4,7 @@
 // FreezeAura, AutoExplosion, DroneCollisions
 // ============================================================
 
-import { GameState, GameEvent, GameOverData, PowerUpCard, ZombieType } from '../interfaces/types';
+import { GameState, GameEvent, GameOverData, PowerUpCard, ZombieType, PowerUpType } from '../interfaces/types';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { Bullet } from '../entities/Bullet';
@@ -97,16 +97,11 @@ export class GameEngine {
       this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score, kills: this.totalKills });
       this.waveManager.onZombieKilled();
 
-      // Ammo drop: 5-10 ammo of current weapon at zombie death position
-      const weaponName = this.weapons[this.currentWeaponIndex].name;
-      const dropAmount = 5 + Math.floor(Math.random() * 6); // 5-10
-      if (weaponName !== 'Pistol') { // Pistol has infinite ammo
-        this.player.addAmmo(weaponName, dropAmount);
-        EventBus.getInstance().emit(GameEvent.AMMO_CHANGED, {
-          ammo: this.player.getAmmo(),
-          maxAmmo: this.weapons[this.currentWeaponIndex].maxAmmo,
-          weaponName: weaponName,
-        });
+      // Random drop: Ammo box (20% chance)
+      if (Math.random() < 0.2) {
+        // Drop 10-20 ammo. The player will get this when they collide with the box.
+        const dropAmount = 10 + Math.floor(Math.random() * 11);
+        this.powerUps.push(new PowerUp(killData.x, killData.y, PowerUpType.AMMO, dropAmount));
       }
     });
 
@@ -255,6 +250,10 @@ export class GameEngine {
     if (this.inputManager.consumeKey('3')) this.switchWeapon(2);
 
     if (this.inputManager.consumeKey('Escape')) {
+      // Clear all held keys + reset player so nothing is "stuck" during the pause
+      this.inputManager.clearInputs();
+      this.player.setMoveDirection(Vector2D.zero());
+      this.player.setFiring(false);
       this.setGameState(GameState.PAUSED);
     }
   }
@@ -450,6 +449,11 @@ export class GameEngine {
 
   resume(): void {
     if (this.gameState === GameState.PAUSED) {
+      // Clear stale keys (e.g. Escape, W, A held at pause time) so the player
+      // doesn't immediately drift or the game doesn't instantly re-pause.
+      this.inputManager.clearInputs();
+      this.player.setMoveDirection(Vector2D.zero());
+      this.player.setFiring(false);
       this.lastFrameTime = performance.now();
       this.setGameState(GameState.PLAYING);
     }
