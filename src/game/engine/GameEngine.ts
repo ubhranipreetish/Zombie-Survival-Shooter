@@ -262,7 +262,7 @@ export class GameEngine {
     return this.cardSystem.getCollectedCards();
   }
 
-  startGame(): void {
+  startGame(startWave: number = 1): void {
     AudioSystem.getInstance().startBGM(); // User gesture un-suspends Audio Context here
     this.score = 0;
     this.totalKills = 0;
@@ -287,7 +287,7 @@ export class GameEngine {
     this.unsubscribers = [];
     
     this.setupEventListeners();
-    this.waveManager = new WaveManager(this.canvas.width, this.canvas.height);
+    this.waveManager = new WaveManager(this.canvas.width, this.canvas.height, startWave);
 
     this.baseWeapons = [new Pistol(), new Shotgun(), new Rifle()];
     this.flamethrower = new Flamethrower();

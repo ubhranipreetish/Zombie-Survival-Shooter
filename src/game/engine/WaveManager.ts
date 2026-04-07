@@ -25,8 +25,8 @@ export class WaveManager {
   private totalZombiesKilled: number;
   private bossSpawned: boolean;
 
-  constructor(canvasWidth: number, canvasHeight: number) {
-    this.currentWave = 0;
+  constructor(canvasWidth: number, canvasHeight: number, startWave: number = 1) {
+    this.currentWave = startWave - 1; // It increments to startWave on first transition
     this.enemiesSpawned = 0;
     this.spawnTimer = 0;
     this.waveTransitionTimer = 0;
@@ -37,7 +37,7 @@ export class WaveManager {
     this.eventBus = EventBus.getInstance();
     this.totalZombiesKilled = 0;
     this.bossSpawned = false;
-    this.waveConfig = this.generateWaveConfig(1);
+    this.waveConfig = this.generateWaveConfig(startWave);
   }
 
   private generateWaveConfig(wave: number): WaveConfig {

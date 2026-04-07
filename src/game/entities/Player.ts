@@ -24,7 +24,6 @@ export class Player extends GameObject implements IDamageable {
   private moveSpeed: number;
   private baseMoveSpeed: number;
   private lastFireTime: number;
-  private invincibilityTimer: number;
   private ammo: Map<string, number>;
   private canvasWidth: number;
   private canvasHeight: number;
@@ -42,9 +41,10 @@ export class Player extends GameObject implements IDamageable {
   private explosionLevel: number; // was hasExplosiveBullets
   private bulletStormCount: number;
   private lifestealPercent: number;
-  private shieldLevel: number; // scales cooldown
-  private shieldCooldown: number;
-  private shieldTimer: number;
+  private shieldLevel: number = 0;
+  private shieldCooldown: number = 0;
+  private shieldTimer: number = 0;
+  private invincibilityTimer: number = 0;
   private freezeLevel: number; // scales radius and strength
   private freezeRadius: number;
   private freezeStrength: number;
@@ -76,7 +76,6 @@ export class Player extends GameObject implements IDamageable {
     this.baseMoveSpeed = 200;
     this.moveSpeed = 200;
     this.lastFireTime = 0;
-    this.invincibilityTimer = 0;
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
     this.moveDirection = Vector2D.zero();
@@ -102,6 +101,7 @@ export class Player extends GameObject implements IDamageable {
     this.shieldLevel = 0;
     this.shieldCooldown = 8;
     this.shieldTimer = 0;
+    this.invincibilityTimer = 0;
 
     this.freezeLevel = 0;
     this.freezeRadius = 0;
@@ -157,14 +157,17 @@ export class Player extends GameObject implements IDamageable {
   // ----- IDamageable -----
 
   takeDamage(amount: number): void {
+    if (this.invincibilityTimer > 0) return;
+
     // Shield aura blocks one hit
     if (this.shieldLevel > 0 && this.shieldTimer <= 0) {
       this.shieldTimer = this.shieldCooldown;
-      // Shield absorbs the hit
+      this.invincibilityTimer = 0.2; // brief iframe even on shield hit to prevent double-procs
       return;
     }
 
     this.health -= amount;
+    this.invincibilityTimer = 0.15; // 150ms fixed damage cooldown to prevent one-hots from multiple rapid overlaps.
 
     if (this.health <= 0) {
       this.health = 0;

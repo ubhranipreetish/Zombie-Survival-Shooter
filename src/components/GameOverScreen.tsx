@@ -153,7 +153,7 @@ export default function GameOverScreen({ gameOverData, onRestart, onMainMenu }: 
     <div id="game-over-screen" className="menu-overlay game-over-overlay">
       {/* Fire particle canvas behind everything */}
       <canvas ref={canvasRef} style={{
-        position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0, opacity: 0.8
+        position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0, opacity: isNewHighScore ? 1 : 0.5
       }} />
 
       <div className="menu-content game-over-content" style={{ position: 'relative', zIndex: 1 }}>

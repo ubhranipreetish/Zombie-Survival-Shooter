@@ -3,11 +3,15 @@
 // MainMenu.tsx — Title screen with premium dark UI
 // ============================================================
 
+import { useState } from 'react';
+
 interface MainMenuProps {
-  onStartGame: () => void;
+  onStartGame: (startWave: number) => void;
 }
 
 export default function MainMenu({ onStartGame }: MainMenuProps) {
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [startWave, setStartWave] = useState(1);
   return (
     <div id="main-menu" className="menu-overlay">
       <div className="menu-content">
@@ -27,11 +31,42 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
         <button
           id="start-game-btn"
           className="menu-start-btn"
-          onClick={onStartGame}
+          onClick={() => onStartGame(isAdminMode ? startWave : 1)}
         >
           <span className="menu-start-btn-text">START GAME</span>
           <div className="menu-start-btn-glow" />
         </button>
+
+        {/* Admin Mode Toggle */}
+        <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#888', fontSize: '0.8rem', letterSpacing: '2px' }}>
+            <input 
+              type="checkbox" 
+              checked={isAdminMode} 
+              onChange={e => setIsAdminMode(e.target.checked)} 
+              style={{ cursor: 'pointer' }}
+            />
+            ADMIN MODE
+          </label>
+          
+          {isAdminMode && (
+            <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ color: '#aaa', fontSize: '0.9rem' }}>START WAVE:</span>
+              <input 
+                type="number" 
+                min="1" 
+                max="100"
+                value={startWave}
+                onChange={e => setStartWave(Math.max(1, parseInt(e.target.value) || 1))}
+                style={{ 
+                  width: '60px', padding: '4px', background: 'rgba(0,0,0,0.5)', 
+                  border: '1px solid #ff4444', color: '#fff', textAlign: 'center',
+                  borderRadius: '4px', outline: 'none'
+                }}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Instructions */}
         <div className="menu-instructions">

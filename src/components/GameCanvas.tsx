@@ -87,11 +87,11 @@ export default function GameCanvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState]);
 
-  const handleStartGame = useCallback(() => {
+  const handleStartGame = useCallback((startWave: number = 1) => {
     setCollectedCards([]);
     setScore(0);
     setLevel(1);
-    engineRef.current?.startGame();
+    engineRef.current?.startGame(startWave);
   }, []);
 
   const handleResume = useCallback(() => {
