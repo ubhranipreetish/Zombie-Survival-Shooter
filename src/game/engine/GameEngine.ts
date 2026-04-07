@@ -47,6 +47,9 @@ export class GameEngine {
   private gameState: GameState;
   private score: number;
   private totalKills: number;
+  private totalShots: number = 0;
+  private totalHits: number = 0;
+  private weaponKills: Record<string, number> = {};
   private lastFrameTime: number;
   private animationFrameId: number | null;
 
@@ -69,6 +72,7 @@ export class GameEngine {
 
   // Card selection
   private pendingCardChoices: PowerUpCard[];
+  private unsubscribers: Array<() => void> = [];
 
   private onStateChange?: (state: GameState) => void;
   private onCardChoices?: (cards: PowerUpCard[]) => void;
@@ -112,11 +116,15 @@ export class GameEngine {
   }
 
   private setupEventListeners(): void {
-    this.eventBus.subscribe(GameEvent.ZOMBIE_KILLED, (data: unknown) => {
-      const killData = data as { type: ZombieType; score: number; exp: number; x: number; y: number };
+    this.unsubscribers.push(this.eventBus.subscribe(GameEvent.ZOMBIE_KILLED, (data: unknown) => {
+      const killData = data as { type: ZombieType; score: number; exp: number; x: number; y: number; weaponName: string };
       AudioSystem.getInstance().playEnemyDying();
       this.score += killData.score;
       this.totalKills++;
+      
+      const wName = killData.weaponName || 'Unknown';
+      this.weaponKills[wName] = (this.weaponKills[wName] || 0) + 1;
+      
       this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score, kills: this.totalKills });
       this.waveManager.onZombieKilled();
 
@@ -137,9 +145,9 @@ export class GameEngine {
           type, dropAmount,
         ));
       }
-    });
+    }));
 
-    this.eventBus.subscribe(GameEvent.WAVE_COMPLETE, () => {
+    this.unsubscribers.push(this.eventBus.subscribe(GameEvent.WAVE_COMPLETE, () => {
       this.score += 50;
       this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score });
 
@@ -170,29 +178,29 @@ export class GameEngine {
       this.player.setMoveDirection(Vector2D.zero());
       this.player.setFiring(false);
       // No card selection on wave complete — cards only come from leveling up
-    });
+    }));
 
-    this.eventBus.subscribe(GameEvent.WAVE_CHANGED, () => {
-    });
+    this.unsubscribers.push(this.eventBus.subscribe(GameEvent.WAVE_CHANGED, () => {
+    }));
 
     // Enemies shooting (e.g. ShooterZombie)
-    this.eventBus.subscribe(GameEvent.ENEMY_SHOOT, (data: unknown) => {
+    this.unsubscribers.push(this.eventBus.subscribe(GameEvent.ENEMY_SHOOT, (data: unknown) => {
       AudioSystem.getInstance().playEnemyShoot();
       const d = data as { x: number; y: number; dirX: number; dirY: number; speed: number; damage: number; radius?: number; isSlam?: boolean };
       // Fallback for 0,0 direction vector causing NaN on normalize
       const dirX = d.dirX === 0 && d.dirY === 0 ? 1 : d.dirX;
       this.enemyBullets.push(new EnemyBullet(d.x, d.y, dirX, d.dirY, d.speed, d.damage, d.radius, d.isSlam));
-    });
+    }));
 
     // SpawnerZombie creates minions via event
-    this.eventBus.subscribe(GameEvent.SPAWN_MINION, (data: unknown) => {
+    this.unsubscribers.push(this.eventBus.subscribe(GameEvent.SPAWN_MINION, (data: unknown) => {
       const d = data as { x: number; y: number };
       const minion = new NormalZombie(d.x, d.y, 0.5, 1.2);
       this.enemies.push(minion);
-    });
+    }));
 
     // Boss defeated — grant ability
-    this.eventBus.subscribe(GameEvent.BOSS_DEFEATED, (data: unknown) => {
+    this.unsubscribers.push(this.eventBus.subscribe(GameEvent.BOSS_DEFEATED, (data: unknown) => {
       const d = data as { type: ZombieType };
       if (d.type === ZombieType.BOSS_NECROMANCER || d.type === ZombieType.BOSS_JUGGERNAUT) {
         this.abilitySystem.grantAbility(AbilityType.GRENADE);
@@ -203,7 +211,7 @@ export class GameEngine {
       } else {
         this.abilitySystem.grantAbility(AbilityType.GRENADE);
       }
-    });
+    }));
   }
 
   setOnStateChange(callback: (state: GameState) => void): void {
@@ -258,6 +266,9 @@ export class GameEngine {
     AudioSystem.getInstance().startBGM(); // User gesture un-suspends Audio Context here
     this.score = 0;
     this.totalKills = 0;
+    this.totalShots = 0;
+    this.totalHits = 0;
+    this.weaponKills = {};
     this.enemies = [];
     this.bullets = [];
     this.enemyBullets = [];
@@ -268,8 +279,13 @@ export class GameEngine {
     this.cardSystem.reset();
     this.expSystem.reset();
     this.abilitySystem.reset();
-    EventBus.resetInstance();
+    // Do not call EventBus.resetInstance() — it destroys GameCanvas's listeners!
     this.eventBus = EventBus.getInstance();
+    
+    // Clean up old listeners ifstartGame is called again (e.g., from handleRestart)
+    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
+    
     this.setupEventListeners();
     this.waveManager = new WaveManager(this.canvas.width, this.canvas.height);
 
@@ -423,6 +439,7 @@ export class GameEngine {
     const bulletConfigs = this.player.tryFire(currentTime);
     if (bulletConfigs) {
       AudioSystem.getInstance().playShoot(this.weapons[this.currentWeaponIndex].name);
+      this.totalShots += bulletConfigs.length;
       for (const config of bulletConfigs) {
         this.bullets.push(
           new Bullet(
@@ -490,6 +507,7 @@ export class GameEngine {
         const radius = grenade.getExplosionRadius();
         const damage = grenade.getExplosionDamage();
         this.particleSystem.createExplosion(pos.x, pos.y, '#ff6600', 40, 400);
+        AudioSystem.getInstance().playExplosion();
         for (const enemy of this.enemies) {
           if (!enemy.isActive()) continue;
           if (pos.distanceTo(enemy.getPosition()) < radius) {
@@ -563,7 +581,8 @@ export class GameEngine {
   }
 
   private checkCollisions(): void {
-    this.collisionManager.checkBulletEnemyCollisions(this.bullets, this.enemies, this.player);
+    const hits = this.collisionManager.checkBulletEnemyCollisions(this.bullets, this.enemies, this.player);
+    this.totalHits += hits;
     this.collisionManager.checkEnemyPlayerCollisions(this.enemies, this.player);
     this.collisionManager.checkEnemyBulletPlayerCollisions(this.enemyBullets, this.player);
     this.collisionManager.checkPlayerPowerUpCollisions(this.player, this.powerUps);
@@ -683,10 +702,24 @@ export class GameEngine {
   }
 
   private gameOver(): void {
+    const accuracy = this.totalShots > 0 ? Math.round((this.totalHits / this.totalShots) * 100) : 0;
+    
+    let favoriteWeapon = 'None';
+    let maxKills = 0;
+    for (const [weapon, kills] of Object.entries(this.weaponKills)) {
+      if (kills > maxKills) {
+        maxKills = kills;
+        favoriteWeapon = weapon;
+      }
+    }
+
     const data: GameOverData = {
       score: this.score,
       wave: this.waveManager.getCurrentWave(),
-      zombiesKilled: this.waveManager.getTotalZombiesKilled(),
+      zombiesKilled: this.totalKills,
+      level: this.expSystem.getLevel(),
+      accuracy,
+      favoriteWeapon,
     };
     AudioSystem.getInstance().stopBGM();
     this.setGameState(GameState.GAME_OVER);
@@ -738,7 +771,11 @@ export class GameEngine {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
     }
+    
+    // Unsubscribe all engine-level event listeners to prevent memory leaks and duplicate events
+    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
+    
     this.inputManager.destroy();
-    this.eventBus.clear();
   }
 }

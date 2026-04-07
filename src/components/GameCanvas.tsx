@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '@/game/engine/GameEngine';
-import { GameState, PowerUpCard, GameEvent } from '@/game/interfaces/types';
+import { GameState, PowerUpCard, GameEvent, GameOverData } from '@/game/interfaces/types';
 import { EventBus } from '@/game/events/EventBus';
 import HUD from './HUD';
 import MainMenu from './MainMenu';
@@ -22,6 +22,7 @@ export default function GameCanvas() {
   const [collectedCards, setCollectedCards] = useState<PowerUpCard[]>([]);
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
+  const [gameOverData, setGameOverData] = useState<GameOverData | null>(null);
 
   const getCanvasSize = useCallback(() => {
     return {
@@ -50,6 +51,9 @@ export default function GameCanvas() {
     const unsubExp = eb.subscribe(GameEvent.EXP_CHANGED, (d: unknown) => {
       setLevel((d as { level: number }).level);
     });
+    const unsubGameOver = eb.subscribe(GameEvent.GAME_OVER, (d: unknown) => {
+      setGameOverData(d as GameOverData);
+    });
 
     const handleResize = () => {
       const { width, height } = getCanvasSize();
@@ -63,6 +67,7 @@ export default function GameCanvas() {
       window.removeEventListener('resize', handleResize);
       unsubScore();
       unsubExp();
+      unsubGameOver();
       engine.destroy();
       engineRef.current = null;
     };
@@ -158,7 +163,7 @@ export default function GameCanvas() {
       )}
 
       {gameState === GameState.GAME_OVER && (
-        <GameOverScreen onRestart={handleRestart} onMainMenu={handleQuitToMenu} />
+        <GameOverScreen gameOverData={gameOverData} onRestart={handleRestart} onMainMenu={handleQuitToMenu} />
       )}
     </div>
   );

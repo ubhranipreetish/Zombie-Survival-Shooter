@@ -33,7 +33,7 @@ export class CollisionManager {
    * Handles piercing, explosive, shield zombies, lifesteal.
    */
   checkBulletEnemyCollisions(bullets: Bullet[], enemies: Enemy[], player: Player): number {
-    let kills = 0;
+    let hits = 0;
 
     for (const bullet of bullets) {
       if (!bullet.isActive()) continue;
@@ -80,6 +80,7 @@ export class CollisionManager {
 
           // Mark as hit
           bullet.addHit(enemy);
+          hits++;
           // Shield zombie — directional damage
           if (enemy instanceof ShieldZombie) {
             (enemy as ShieldZombie).takeDamageFrom(
@@ -135,7 +136,6 @@ export class CollisionManager {
 
           // Kill logic
           if (!enemy.isAlive()) {
-            kills++;
             const ePos = enemy.getPosition();
             this.particleSystem.createExplosion(ePos.x, ePos.y, enemy.getColor(), 15, 200);
             this.eventBus.emit(GameEvent.ZOMBIE_KILLED, {
@@ -160,7 +160,7 @@ export class CollisionManager {
       }
     }
 
-    return kills;
+    return hits;
   }
 
   /**
@@ -172,7 +172,7 @@ export class CollisionManager {
       if (enemy.collidesWith(player)) {
         player.takeDamage(enemy.getDamage());
         
-        // Bounce enemy back
+        // Bounce enemy back — strong enough that they clear the player before invincibility expires
         const p1 = enemy.getPosition();
         const p2 = player.getPosition();
         const dx = p1.x - p2.x;
@@ -180,10 +180,9 @@ export class CollisionManager {
         const dist = Math.sqrt(dx * dx + dy * dy);
         
         if (dist > 0) {
-          // Instead of an instant 20px teleport, we apply a smooth knockback velocity
-          // ~400px/sec velocity over a few frames creates a very smooth, springy bounce
-          const pushX = (dx / dist) * 400; 
-          const pushY = (dy / dist) * 400;
+          // Strong knockback so enemy is pushed well outside collision range
+          const pushX = (dx / dist) * 800; 
+          const pushY = (dy / dist) * 800;
           enemy.applyKnockback(new Vector2D(pushX, pushY));
         }
       }

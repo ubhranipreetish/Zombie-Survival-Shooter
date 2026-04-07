@@ -23,7 +23,7 @@ export class BossTroopBerserker extends Enemy {
       15,                             // decent damage
       25,                             // medium score
     );
-    this.chargeTimer = 2 + Math.random() * 2;
+    this.chargeTimer = 2.4 + Math.random() * 2.4;
     this.isCharging = false;
     this.chargeDir = Vector2D.zero();
     this.chargeElapsed = 0;
@@ -42,7 +42,7 @@ export class BossTroopBerserker extends Enemy {
       this.position = this.position.add(this.chargeDir.scale(350 * deltaTime));
       if (this.chargeElapsed >= 0.6) {
         this.isCharging = false;
-        this.chargeTimer = 2 + Math.random();
+        this.chargeTimer = 2.4 + Math.random() * 1.2;
       }
     } else {
       super.update(deltaTime);

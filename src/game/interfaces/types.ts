@@ -144,6 +144,9 @@ export interface GameOverData {
   score: number;
   wave: number;
   zombiesKilled: number;
+  level?: number;
+  accuracy?: number;
+  favoriteWeapon?: string;
 }
 
 /**

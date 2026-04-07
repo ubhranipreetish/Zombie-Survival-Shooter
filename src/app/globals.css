@@ -231,21 +231,32 @@ html, body {
    Game Over
    ============================================================ */
 
-.game-over-overlay { background: rgba(15, 0, 0, 0.92); }
+.game-over-overlay {
+  background: rgba(15, 0, 0, 0.92);
+  overflow: hidden;
+}
 
 .game-over-title {
   font-family: var(--font-heading);
   font-size: 48px;
   font-weight: 900;
-  letter-spacing: 8px;
+  letter-spacing: 5px;
   color: var(--accent-red);
   text-shadow: 0 0 40px var(--glow-red);
+  white-space: nowrap;
+}
+
+.game-over-content {
+  max-height: 95vh;
+  overflow: hidden;
+  padding: 24px 40px;
+  gap: 12px;
 }
 
 .game-over-stats {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
   width: 100%;
 }
 
@@ -275,7 +286,7 @@ html, body {
 .game-over-stat-row {
   display: flex;
   justify-content: center;
-  gap: 40px;
+  gap: 24px;
 }
 
 .game-over-buttons {

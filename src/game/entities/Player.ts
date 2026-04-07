@@ -157,8 +157,6 @@ export class Player extends GameObject implements IDamageable {
   // ----- IDamageable -----
 
   takeDamage(amount: number): void {
-    if (this.invincibilityTimer > 0) return;
-
     // Shield aura blocks one hit
     if (this.shieldLevel > 0 && this.shieldTimer <= 0) {
       this.shieldTimer = this.shieldCooldown;
@@ -167,7 +165,6 @@ export class Player extends GameObject implements IDamageable {
     }
 
     this.health -= amount;
-    this.invincibilityTimer = 0.5;
 
     if (this.health <= 0) {
       this.health = 0;
@@ -406,6 +403,10 @@ export class Player extends GameObject implements IDamageable {
 
   getDamageMultiplier(): number {
     return this.damageMultiplier;
+  }
+
+  getFireRateMultiplier(): number {
+    return this.fireRateMultiplier;
   }
 
   getHasPiercing(): boolean {

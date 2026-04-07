@@ -143,8 +143,8 @@ export class AudioSystem {
   }
 
   playShoot(weaponName: string = 'Pistol'): void {
-    if (weaponName === 'Shotgun' && this.playBuffer('shotgun', 1.3, 0.75)) return;
-    if (weaponName === 'Rifle' && this.playBuffer('rifle', 1.0, 1.4)) return;
+    if (weaponName === 'Shotgun' && this.playBuffer('shotgun', 1.3, 1.0)) return;
+    if (weaponName === 'Rifle' && this.playBuffer('rifle', 1.0, 1.0)) return;
     if (weaponName === 'Crossbow' && this.playBuffer('crossbow')) return;
     if (weaponName === 'LaserRifle' && this.playBuffer('lazer')) return;
     if (weaponName === 'Flamethrower' && this.playBuffer('flamethrower', 2.0)) return;

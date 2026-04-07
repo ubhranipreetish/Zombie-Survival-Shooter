@@ -77,19 +77,19 @@ const CARD_POOL: PowerUpCard[] = [
   {
     id: 'damage_boost',
     name: 'Hollow Points',
-    description: '+20% damage for all weapons',
+    description: '+40% damage for all weapons',
     rarity: CardRarity.UNCOMMON,
     effectType: CardEffectType.DAMAGE_BOOST,
-    value: 0.20,
+    value: 0.40,
     icon: '💥',
   },
   {
     id: 'fire_rate_boost',
     name: 'Quick Hands',
-    description: '+25% fire rate for all weapons',
+    description: '+30% fire rate for all weapons',
     rarity: CardRarity.UNCOMMON,
     effectType: CardEffectType.FIRE_RATE_BOOST,
-    value: 0.25,
+    value: 0.30,
     icon: '⚡',
   },
 

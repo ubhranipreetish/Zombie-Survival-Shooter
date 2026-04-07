@@ -54,7 +54,13 @@ export class JuggernautBoss extends Enemy {
     this.slamCooldown = 8;
     this.slamFlash = 0;
     this.armorPhase = 0;
+    // Slam animation phases: 0=idle, 1=warning (circle shrinks in), 2=expand out, 3=explode
+    this.slamPhase = 0;
+    this.slamAnimTimer = 0;
   }
+
+  private slamPhase: number;
+  private slamAnimTimer: number;
 
   getColor(): string { return '#d32f2f'; }
   protected getGlowColor(): string { return 'rgba(211, 47, 47, 0.3)'; }
@@ -70,19 +76,12 @@ export class JuggernautBoss extends Enemy {
     }
   }
 
-  // Signature move: massive ground slam followed immediately by a dash
+  // Signature move: massive ground slam with warning animation
   protected performSignatureMove(): void {
-    this.slamFlash = 0.8;
-    EventBus.getInstance().emit(GameEvent.ENEMY_SHOOT, {
-      x: this.position.x,
-      y: this.position.y,
-      dirX: 0, dirY: 0,
-      speed: 0,
-      damage: 60,
-      isSlam: true,
-      radius: 200, // larger radius
-    });
-
+    // Start the warning animation instead of instant damage
+    this.slamPhase = 1;
+    this.slamAnimTimer = 0;
+    this.slamFlash = 0;
     // Reset charge timers to trigger a dash soon
     this.isCharging = false;
     this.isWindingUp = false;
@@ -118,20 +117,34 @@ export class JuggernautBoss extends Enemy {
       }
     }
 
-    // Ground slam
-    this.slamTimer += deltaTime;
-    if (this.slamTimer >= this.slamCooldown && !this.isCharging) {
-      this.slamTimer = 0;
-      this.slamFlash = 0.5;
-      EventBus.getInstance().emit(GameEvent.ENEMY_SHOOT, {
-        x: this.position.x,
-        y: this.position.y,
-        dirX: 0, dirY: 0,
-        speed: 0,
-        damage: 30,
-        isSlam: true,
-        radius: 120,
-      });
+    // Ground slam with warning animation
+    if (this.slamPhase === 0) {
+      this.slamTimer += deltaTime;
+      if (this.slamTimer >= this.slamCooldown && !this.isCharging) {
+        this.slamTimer = 0;
+        this.slamPhase = 1;
+        this.slamAnimTimer = 0;
+      }
+    } else {
+      this.slamAnimTimer += deltaTime;
+      if (this.slamPhase === 1 && this.slamAnimTimer >= 0.6) {
+        // Phase 1 done (circle closed in), now expand back out
+        this.slamPhase = 2;
+        this.slamAnimTimer = 0;
+      } else if (this.slamPhase === 2 && this.slamAnimTimer >= 0.4) {
+        // Phase 2 done (circle expanded), now EXPLODE
+        this.slamPhase = 0;
+        this.slamFlash = 0.5;
+        EventBus.getInstance().emit(GameEvent.ENEMY_SHOOT, {
+          x: this.position.x,
+          y: this.position.y,
+          dirX: 0, dirY: 0,
+          speed: 0,
+          damage: 30,
+          isSlam: true,
+          radius: 120,
+        });
+      }
     }
 
     this.emitHealthUpdate();
@@ -165,8 +178,10 @@ export class JuggernautBoss extends Enemy {
       }
     }
 
-    // Charge wind-up path preview
+    // Charge wind-up path preview — visual only, 50% opacity
     if (this.isWindingUp) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
       ctx.strokeStyle = `rgba(255, 0, 0, ${0.4 + Math.sin(this.windUpTimer * 20) * 0.2})`;
       ctx.lineWidth = 4;
       ctx.setLineDash([10, 10]);
@@ -189,9 +204,42 @@ export class JuggernautBoss extends Enemy {
       ctx.lineTo(endX + perp.x * 10 - this.lockedChargeDirection.x * 10, endY + perp.y * 10 - this.lockedChargeDirection.y * 10);
       ctx.lineTo(endX - perp.x * 10 - this.lockedChargeDirection.x * 10, endY - perp.y * 10 - this.lockedChargeDirection.y * 10);
       ctx.fill();
+      ctx.restore();
     }
 
-    // Slam shockwave
+    // Slam warning animation
+    if (this.slamPhase === 1) {
+      // Circle starts at full radius and shrinks inward
+      const progress = Math.min(1, this.slamAnimTimer / 0.6);
+      const warningRadius = 120 * (1 - progress);
+      ctx.strokeStyle = `rgba(255, 87, 34, ${0.6 + progress * 0.4})`;
+      ctx.lineWidth = 3 + progress * 3;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(5, warningRadius), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Inner pulsing fill
+      ctx.fillStyle = `rgba(255, 87, 34, ${0.1 + progress * 0.15})`;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(5, warningRadius), 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.slamPhase === 2) {
+      // Circle expands back out from boss to full radius
+      const progress = Math.min(1, this.slamAnimTimer / 0.4);
+      const expandRadius = 120 * progress;
+      ctx.strokeStyle = `rgba(255, 30, 0, ${1 - progress * 0.3})`;
+      ctx.lineWidth = 6 - progress * 2;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(5, expandRadius), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255, 30, 0, ${0.25 - progress * 0.15})`;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(5, expandRadius), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Slam shockwave (after explosion)
     if (this.slamFlash > 0) {
       const shockSize = Math.max(0.1, (0.8 - this.slamFlash) * 400);
       ctx.strokeStyle = `rgba(255, 87, 34, ${this.slamFlash})`;
