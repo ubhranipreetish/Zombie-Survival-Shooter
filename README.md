@@ -76,8 +76,8 @@ UML diagrams covering the class hierarchy, use cases, sequence flows, and entity
 
 ## Team and Contributions
 
-| Name | Role | Contributions |
-|---|---|---|
+| Name | Role 
+|---|---|
 | Preetish Ubhrani | Project Lead and Game Architect 
 | Aditya Bhardwaj | Game Systems Developer 
 | Kshitiz Surana | Frontend Developer 
