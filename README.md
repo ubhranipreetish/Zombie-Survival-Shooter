@@ -94,7 +94,8 @@ graph TD
     UI -.->|Maintains Bounds| Canvas
     Input -->|Triggers Actions| MainLoop
     
-    MainLoop <-->|Orchestrates Game Logic| SubSystems
+    MainLoop -->|Orchestrates Subsystems| SubSystems
+    SubSystems -->|Reports back to| MainLoop
     MainLoop -.->|Delegates Paint Frame| Renderer
     Renderer -->|Draws Frame| Canvas
     
@@ -102,7 +103,8 @@ graph TD
     Card -->|Injects Upgrades| Player
     Collision -->|Validates Vector Hitboxes| Entities
     
-    MainLoop <-->|Calls update()| Entities
+    MainLoop -->|Calls update on| Entities
+    Entities -->|Passed to rendering| MainLoop
 ```
 
 The project is divided into four layers:
