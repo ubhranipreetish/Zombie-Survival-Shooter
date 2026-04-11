@@ -4,7 +4,7 @@
 // Strategy Pattern — swappable via Player.setWeapon()
 // ============================================================
 
-import { IWeaponStrategy, BulletConfig } from '../interfaces/IWeaponStrategy';
+import { Weapons, BulletConfig } from '../interfaces/Weapons';
 import { Vector2D } from '../utils/Vector2D';
 
 /**
@@ -12,12 +12,12 @@ import { Vector2D } from '../utils/Vector2D';
  * High fire rate, moderate per-hit damage, long range.
  * Beams are thin, fast, and cyan-colored.
  */
-export class LaserRifle implements IWeaponStrategy {
-  readonly name = 'LaserRifle';
-  readonly fireRate = 50;       // 50 shots per second! Literally a line!
-  readonly damage = 3;          // very low per hit, since it hits constantly
-  readonly maxAmmo = 500;
-  readonly color = '#00e5ff';   // cyan
+export class LaserRifle implements Weapons {
+  readonly name: string = 'LaserRifle';
+  readonly fireRate: number = 50;       // 50 shots per second! Literally a line!
+  readonly damage: number = 3;          // very low per hit, since it hits constantly
+  readonly maxAmmo: number = 500;
+  readonly color: string = '#00e5ff';   // cyan
 
   fire(origin: Vector2D, direction: Vector2D): BulletConfig[] {
     const bullets: BulletConfig[] = [];

@@ -4,7 +4,7 @@
 // Strategy Pattern — swappable via Player.setWeapon()
 // ============================================================
 
-import { IWeaponStrategy, BulletConfig } from '../interfaces/IWeaponStrategy';
+import { Weapons, BulletConfig } from '../interfaces/Weapons';
 import { Vector2D } from '../utils/Vector2D';
 
 /**
@@ -12,12 +12,12 @@ import { Vector2D } from '../utils/Vector2D';
  * Very high fire rate, low per-hit damage, short range.
  * Flame particles auto-destroy quickly (handled by short bullet lifetime).
  */
-export class Flamethrower implements IWeaponStrategy {
-  readonly name = 'Flamethrower';
-  readonly fireRate = 20;       // 20 shots per second
-  readonly damage = 8;          // per flame particle
-  readonly maxAmmo = 200;
-  readonly color = '#ff6b35';   // fiery orange
+export class Flamethrower implements Weapons {
+  readonly name: string = 'Flamethrower';
+  readonly fireRate: number = 20;       // 20 shots per second
+  readonly damage: number = 8;          // per flame particle
+  readonly maxAmmo: number = 200;
+  readonly color: string = '#ff6b35';   // fiery orange
 
   fire(origin: Vector2D, direction: Vector2D): BulletConfig[] {
     const bullets: BulletConfig[] = [];

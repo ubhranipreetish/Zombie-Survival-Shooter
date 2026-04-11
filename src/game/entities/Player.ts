@@ -6,7 +6,7 @@
 
 import { GameObject } from './GameObject';
 import { IDamageable } from '../interfaces/IDamageable';
-import { IWeaponStrategy, BulletConfig } from '../interfaces/IWeaponStrategy';
+import { Weapons, BulletConfig } from '../interfaces/Weapons';
 import { Vector2D } from '../utils/Vector2D';
 import { clamp } from '../utils/MathUtils';
 import { EventBus } from '../events/EventBus';
@@ -19,7 +19,7 @@ import { GameEvent, CardEffectType, PowerUpCard } from '../interfaces/types';
 export class Player extends GameObject implements IDamageable {
   private health: number;
   private maxHealth: number;
-  private weapon: IWeaponStrategy;
+  private weapon: Weapons;
   private aimAngle: number;
   private moveSpeed: number;
   private baseMoveSpeed: number;
@@ -64,7 +64,7 @@ export class Player extends GameObject implements IDamageable {
   constructor(
     x: number,
     y: number,
-    initialWeapon: IWeaponStrategy,
+    initialWeapon: Weapons,
     canvasWidth: number,
     canvasHeight: number,
   ) {
@@ -194,7 +194,7 @@ export class Player extends GameObject implements IDamageable {
 
   // ----- Weapon (Strategy Pattern) -----
 
-  setWeapon(weapon: IWeaponStrategy): void {
+  setWeapon(weapon: Weapons): void {
     this.weapon = weapon;
     EventBus.getInstance().emit(GameEvent.WEAPON_CHANGED, {
       name: weapon.name,
@@ -207,7 +207,7 @@ export class Player extends GameObject implements IDamageable {
     });
   }
 
-  getWeapon(): IWeaponStrategy {
+  getWeapon(): Weapons {
     return this.weapon;
   }
 

@@ -1,5 +1,5 @@
 // ============================================================
-// IWeaponStrategy.ts — Strategy Pattern interface
+// Weapons.ts — Strategy Pattern interface
 // Allows swapping weapon behavior at runtime without modifying
 // the Player class (Open/Closed Principle).
 // ============================================================
@@ -29,10 +29,10 @@ export interface BulletConfig {
  * - Shotgun: spread of pellets
  * - Rifle: fast precise shots
  *
- * The Player holds a reference to IWeaponStrategy and calls fire()
+ * The Player holds a reference to Weapons and calls fire()
  * without knowing the concrete weapon type — Polymorphism + Strategy Pattern.
  */
-export interface IWeaponStrategy {
+export interface Weapons {
   readonly name: string;
   readonly fireRate: number;       // shots per second
   readonly damage: number;         // base damage per bullet

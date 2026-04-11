@@ -4,7 +4,7 @@
 // Strategy Pattern — swappable via Player.setWeapon()
 // ============================================================
 
-import { IWeaponStrategy, BulletConfig } from '../interfaces/IWeaponStrategy';
+import { Weapons, BulletConfig } from '../interfaces/Weapons';
 import { Vector2D } from '../utils/Vector2D';
 
 /**
@@ -12,12 +12,12 @@ import { Vector2D } from '../utils/Vector2D';
  * Very slow fire rate, devastating per-hit damage.
  * Bolt is large, slow-moving, and brown/gold colored.
  */
-export class Crossbow implements IWeaponStrategy {
-  readonly name = 'Crossbow';
-  readonly fireRate = 2.0;      // 2.0 shots per second (much faster reload!)
-  readonly damage = 80;         // massive per bolt
-  readonly maxAmmo = 40;
-  readonly color = '#8d6e63';   // brown/gold
+export class Crossbow implements Weapons {
+  readonly name: string = 'Crossbow';
+  readonly fireRate: number = 2.0;      // 2.0 shots per second (much faster reload!)
+  readonly damage: number = 80;         // massive per bolt
+  readonly maxAmmo: number = 40;
+  readonly color: string = '#8d6e63';   // brown/gold
 
   fire(origin: Vector2D, direction: Vector2D): BulletConfig[] {
     return [{

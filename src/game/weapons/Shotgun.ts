@@ -3,7 +3,7 @@
 // Same interface as Pistol but completely different behavior
 // ============================================================
 
-import { IWeaponStrategy, BulletConfig } from "../interfaces/IWeaponStrategy";
+import { Weapons, BulletConfig } from "../interfaces/Weapons";
 import { Vector2D } from "../utils/Vector2D";
 
 /**
@@ -11,12 +11,12 @@ import { Vector2D } from "../utils/Vector2D";
  * Slow fire rate, devastating at close range.
  * Demonstrates Polymorphism: same fire() signature, different behavior.
  */
-export class Shotgun implements IWeaponStrategy {
-  readonly name = "Shotgun";
-  readonly fireRate = 1; // 0.7 shots per second
-  readonly damage = 20; // per pellet
-  readonly maxAmmo = 30;
-  readonly color = "#ff8a65"; // orange
+export class Shotgun implements Weapons {
+  readonly name: string = "Shotgun";
+  readonly fireRate: number = 1; // 0.7 shots per second
+  readonly damage: number = 20; // per pellet
+  readonly maxAmmo: number = 30;
+  readonly color: string = "#ff8a65"; // orange
 
   fire(origin: Vector2D, direction: Vector2D): BulletConfig[] {
     const pelletCount = 6;

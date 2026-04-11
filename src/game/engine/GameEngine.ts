@@ -19,7 +19,7 @@ import { Rifle } from '../weapons/Rifle';
 import { Flamethrower } from '../weapons/Flamethrower';
 import { LaserRifle } from '../weapons/LaserRifle';
 import { Crossbow } from '../weapons/Crossbow';
-import { IWeaponStrategy } from '../interfaces/IWeaponStrategy';
+import { Weapons } from '../interfaces/Weapons';
 import { InputManager } from './InputManager';
 import { CollisionManager } from './CollisionManager';
 import { WaveManager } from './WaveManager';
@@ -61,11 +61,11 @@ export class GameEngine {
   private expOrbs: ExpOrb[];
   private grenades: Grenade[];
 
-  private baseWeapons: IWeaponStrategy[];
+  private baseWeapons: Weapons[];
   private flamethrower: Flamethrower;
   private laserRifle: LaserRifle;
   private crossbow: Crossbow;
-  private weapons: IWeaponStrategy[];
+  private weapons: Weapons[];
   private currentWeaponIndex: number;
   private activeLevelUpAnim: number;
   private canvas: HTMLCanvasElement;
