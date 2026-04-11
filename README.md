@@ -58,6 +58,53 @@ npx tsc --noEmit
 
 ## Architecture
 
+```mermaid
+graph TD
+    %% Architecture Styling
+    classDef frontend fill:#3b82f6,stroke:#fff,stroke-width:2px,color:#fff
+    classDef core fill:#10b981,stroke:#fff,stroke-width:2px,color:#fff
+    classDef system fill:#8b5cf6,stroke:#fff,stroke-width:2px,color:#fff
+    classDef entity fill:#f59e0b,stroke:#fff,stroke-width:2px,color:#fff
+    
+    subgraph Browser [Browser / React Client]
+        UI[Next.js UI & React State]:::frontend
+        Canvas[HTML5 2D Render Target]:::frontend
+    end
+    
+    subgraph Engine [Core Game Engine]
+        MainLoop[Main Loop requestAnimationFrame]:::core
+        Renderer[Canvas Renderer]:::core
+        Input[Input & Mouse Manager]:::core
+    end
+    
+    subgraph SubSystems [Sub-System Logic]
+        Wave[Wave Spawning Manager]:::system
+        Collision[Collision & Physics System]:::system
+        Card[Card & Experience System]:::system
+    end
+    
+    subgraph Entities [Memory Game Objects]
+        Player[Player Entity]:::entity
+        Enemies[Zombies / Boss Nodes]:::entity
+        Bullets[Projectiles Array]:::entity
+    end
+    
+    %% Directional Interactions
+    UI -->|Sends Input Streams| Input
+    UI -.->|Maintains Bounds| Canvas
+    Input -->|Triggers Actions| MainLoop
+    
+    MainLoop <-->|Orchestrates Game Logic| SubSystems
+    MainLoop -.->|Delegates Paint Frame| Renderer
+    Renderer -->|Draws Frame| Canvas
+    
+    Wave -->|Instantiates| Enemies
+    Card -->|Injects Upgrades| Player
+    Collision -->|Validates Vector Hitboxes| Entities
+    
+    MainLoop <-->|Calls update()| Entities
+```
+
 The project is divided into four layers:
 
 **Presentation Layer** — React components handle all UI concerns: the game canvas, HUD, main menu, pause menu, card selection, and game over screen.
