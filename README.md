@@ -60,51 +60,57 @@ npx tsc --noEmit
 
 ```mermaid
 graph TD
-    %% Architecture Styling
-    classDef frontend fill:#3b82f6,stroke:#fff,stroke-width:2px,color:#fff
-    classDef core fill:#10b981,stroke:#fff,stroke-width:2px,color:#fff
-    classDef system fill:#8b5cf6,stroke:#fff,stroke-width:2px,color:#fff
-    classDef entity fill:#f59e0b,stroke:#fff,stroke-width:2px,color:#fff
+    %% Base Layer Logic
+    classDef pres fill:#3b82f6,stroke:#fff,stroke-width:2px,color:#fff
+    classDef eng fill:#10b981,stroke:#fff,stroke-width:2px,color:#fff
+    classDef ent fill:#f59e0b,stroke:#fff,stroke-width:2px,color:#fff
+    classDef supp fill:#8b5cf6,stroke:#fff,stroke-width:2px,color:#fff
     
-    subgraph Browser [Browser / React Client]
-        UI[Next.js UI & React State]:::frontend
-        Canvas[HTML5 2D Render Target]:::frontend
+    subgraph Presentation ["Presentation Layer"]
+        UI[React UI / HUD / Menus]:::pres
+        Canvas[HTML5 Game Canvas]:::pres
     end
     
-    subgraph Engine [Core Game Engine]
-        MainLoop[Main Loop requestAnimationFrame]:::core
-        Renderer[Canvas Renderer]:::core
-        Input[Input & Mouse Manager]:::core
+    subgraph Engine ["Game Engine Layer"]
+        Loop[GameEngine Loop requestAnimationFrame]:::eng
+        Input[InputManager]:::eng
+        Wave[WaveManager]:::eng
+        Collision[CollisionManager]:::eng
+        Renderer[Renderer]:::eng
     end
     
-    subgraph SubSystems [Sub-System Logic]
-        Wave[Wave Spawning Manager]:::system
-        Collision[Collision & Physics System]:::system
-        Card[Card & Experience System]:::system
+    subgraph Entities ["Entity Layer"]
+        Base[GameObject / Player Base]:::ent
+        Enemies[Enemy / Zombie Types / Bosses]:::ent
+        Weapons[Weapons Strategy Array]:::ent
     end
     
-    subgraph Entities [Memory Game Objects]
-        Player[Player Entity]:::entity
-        Enemies[Zombies / Boss Nodes]:::entity
-        Bullets[Projectiles Array]:::entity
+    subgraph Supporting ["Supporting Systems"]
+        Eventbus[EventBus Sub-Pub]:::supp
+        Factory[ZombieFactory]:::supp
+        Card[CardSystem & ExpSystem]:::supp
+        Audio[AudioSystem & AbilitySystem]:::supp
     end
     
-    %% Directional Interactions
-    UI -->|Sends Input Streams| Input
-    UI -.->|Maintains Bounds| Canvas
-    Input -->|Triggers Actions| MainLoop
+    %% Relationships
+    Presentation -->|Sends Iterative Input| Input
+    Presentation -.->|Hosts Screen Display| Canvas
     
-    MainLoop -->|Orchestrates Subsystems| SubSystems
-    SubSystems -->|Reports back to| MainLoop
-    MainLoop -.->|Delegates Paint Frame| Renderer
-    Renderer -->|Draws Frame| Canvas
+    Input -->|Triggers Keyboard/Mouse| Loop
+    Loop -->|Delegates Wave Timing| Wave
+    Loop -->|Delegates Hitbox Math| Collision
+    Loop -.->|Delegates Frame Paints| Renderer
+    Renderer -->|Draws Graphics to| Canvas
     
-    Wave -->|Instantiates| Enemies
-    Card -->|Injects Upgrades| Player
-    Collision -->|Validates Vector Hitboxes| Entities
+    Wave -->|Requests Spawn Configuration| Factory
+    Factory -->|Instantiates Memory Object| Enemies
     
-    MainLoop -->|Calls update on| Entities
-    Entities -->|Passed to rendering| MainLoop
+    Entities -->|Dispatches Triggers| Eventbus
+    Eventbus -->|Notifies Levelups| Card
+    Eventbus -->|Notifies Sounds| Audio
+    
+    Loop -->|Calls update loops over| Entities
+    Collision -->|Evaluates Intersections directly on| Entities
 ```
 
 The project is divided into four layers:
