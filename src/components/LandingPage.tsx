@@ -82,9 +82,9 @@ export default function LandingPage({ onStartGame, savedProgress }: LandingPageP
         {user ? (
           <div className="lp-topbar-user">
             <div className="lp-user-avatar">
-              {user.name.charAt(0).toUpperCase()}
+              {user.name ? user.name.charAt(0).toUpperCase() : '?'}
             </div>
-            <span className="lp-user-name">{user.name}</span>
+            <span className="lp-user-name">{user.name || 'Survivor'}</span>
             <button className="lp-signout-btn" onClick={handleLogout}>
               SIGNOUT
             </button>

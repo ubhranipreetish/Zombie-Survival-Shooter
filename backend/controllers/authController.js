@@ -101,8 +101,8 @@ exports.googleCallback = (req, res) => {
       id: user._id.toString(),
     });
 
-    res.redirect(`http://localhost:3000/auth/callback?${params.toString()}`);
+    res.redirect(`https://zombie-survival-shooter.vercel.app/auth/callback?${params.toString()}`);
   } catch (error) {
-    res.redirect('http://localhost:3000/login?error=server_error');
+    res.redirect('http://zombie-survival-shooter.vercel.app/login?error=server_error');
   }
 };
