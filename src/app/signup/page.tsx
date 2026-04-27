@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const API = process.env.NEXT_PUBLIC_API_URL;
+const API = `${process.env.NEXT_PUBLIC_API_URL}/api/auth`;
 
 export default function SignupPage() {
   const [name, setName] = useState("");

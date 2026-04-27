@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-const API = process.env.NEXT_PUBLIC_API_URL;
+const API = `${process.env.NEXT_PUBLIC_API_URL}/api/auth`;
+
+
 
 function LoginForm() {
   const [email, setEmail] = useState("");
