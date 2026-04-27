@@ -150,6 +150,49 @@ export class Player extends GameObject implements IDamageable {
     };
   }
 
+  loadProgress(stats: any, ammo: Record<string, number>): void {
+    if (stats) {
+      this.damageMultiplier = stats.damageMultiplier ?? 1;
+      this.fireRateMultiplier = stats.fireRateMultiplier ?? 1;
+      this.moveSpeed = stats.moveSpeed ?? 200;
+      this.baseMoveSpeed = this.moveSpeed;
+      this.pierceCount = stats.pierceCount ?? 0;
+      this.explosionLevel = stats.explosionLevel ?? 0;
+      this.extraGunCount = stats.extraGunCount ?? 0;
+      this.bulletStormCount = stats.bulletStormCount ?? 1;
+      this.lifestealPercent = stats.lifestealPercent ?? 0;
+      this.shieldLevel = stats.shieldLevel ?? 0;
+      this.shieldCooldown = stats.shieldCooldown ?? 8;
+      this.freezeLevel = stats.freezeLevel ?? 0;
+      this.freezeRadius = stats.freezeRadius ?? 0;
+      this.freezeStrength = stats.freezeStrength ?? 0;
+      this.autoExplosionLevel = stats.autoExplosionLevel ?? 0;
+      this.autoExplosionDamage = stats.autoExplosionDamage ?? 0;
+      this.droneCount = stats.droneCount ?? 0;
+      this.critChance = stats.critChance ?? 0;
+      this.magnetRadius = stats.magnetRadius ?? 0;
+      this.flamethrowerUnlocked = stats.flamethrowerUnlocked ?? false;
+      this.laserRifleUnlocked = stats.laserRifleUnlocked ?? false;
+      this.crossbowUnlocked = stats.crossbowUnlocked ?? false;
+    }
+
+    if (ammo) {
+      Object.entries(ammo).forEach(([name, amount]) => {
+        this.ammo.set(name, amount);
+      });
+    }
+
+    this.emitStats();
+  }
+
+  getAmmoData(): Record<string, number> {
+    const data: Record<string, number> = {};
+    this.ammo.forEach((val, key) => {
+      data[key] = val;
+    });
+    return data;
+  }
+
   private emitStats(): void {
     EventBus.getInstance().emit(GameEvent.PLAYER_STATS_CHANGED, this.getStats());
   }

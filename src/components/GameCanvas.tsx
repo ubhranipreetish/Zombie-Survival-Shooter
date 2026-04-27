@@ -9,7 +9,7 @@ import { GameEngine } from '@/game/engine/GameEngine';
 import { GameState, PowerUpCard, GameEvent, GameOverData } from '@/game/interfaces/types';
 import { EventBus } from '@/game/events/EventBus';
 import HUD from './HUD';
-import MainMenu from './MainMenu';
+import LandingPage from './LandingPage';
 import GameOverScreen from './GameOverScreen';
 import PauseMenu from './PauseMenu';
 import CardSelection from './CardSelection';
@@ -23,6 +23,7 @@ export default function GameCanvas() {
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [gameOverData, setGameOverData] = useState<GameOverData | null>(null);
+  const [savedProgress, setSavedProgress] = useState<any>(null);
 
   const getCanvasSize = useCallback(() => {
     return {
@@ -31,7 +32,65 @@ export default function GameCanvas() {
     };
   }, []);
 
+  // Fetch progress from backend
+  const fetchProgress = useCallback(async () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+    
+    try {
+      const res = await fetch('http://localhost:5001/api/game/progress', {
+        headers: { 'x-user-id': user.id || user._id }
+      });
+      const data = await res.json();
+      if (data.progress?.hasProgress) {
+        setSavedProgress(data.progress);
+      } else {
+        setSavedProgress(null);
+      }
+    } catch (e) {
+      console.error('Failed to fetch progress', e);
+    }
+  }, []);
+
+  const saveProgress = useCallback(async (data: any) => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
+    try {
+      await fetch('http://localhost:5001/api/game/progress', {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user.id || user._id 
+        },
+        body: JSON.stringify({ progress: data })
+      });
+    } catch (e) {
+      console.error('Failed to save progress', e);
+    }
+  }, []);
+
+  const clearProgress = useCallback(async () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
+    try {
+      await fetch('http://localhost:5001/api/game/progress', {
+        method: 'DELETE',
+        headers: { 'x-user-id': user.id || user._id }
+      });
+      setSavedProgress(null);
+    } catch (e) {
+      console.error('Failed to clear progress', e);
+    }
+  }, []);
+
   useEffect(() => {
+    fetchProgress();
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -53,6 +112,15 @@ export default function GameCanvas() {
     });
     const unsubGameOver = eb.subscribe(GameEvent.GAME_OVER, (d: unknown) => {
       setGameOverData(d as GameOverData);
+      clearProgress();
+    });
+    const unsubWave = eb.subscribe(GameEvent.WAVE_CHANGED, (d: unknown) => {
+      const w = (d as { wave: number }).wave;
+      if (w > 1 && engineRef.current) {
+        const saveData = engineRef.current.getSaveData();
+        saveProgress(saveData);
+        setSavedProgress(saveData);
+      }
     });
 
     const handleResize = () => {
@@ -68,10 +136,11 @@ export default function GameCanvas() {
       unsubScore();
       unsubExp();
       unsubGameOver();
+      unsubWave();
       engine.destroy();
       engineRef.current = null;
     };
-  }, [getCanvasSize]);
+  }, [getCanvasSize, fetchProgress, saveProgress, clearProgress]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,12 +156,23 @@ export default function GameCanvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState]);
 
-  const handleStartGame = useCallback((startWave: number = 1) => {
+  const handleStartGame = useCallback((startWave: number = 1, progressData?: any) => {
+    if (startWave === 1) {
+      clearProgress();
+    }
     setCollectedCards([]);
     setScore(0);
     setLevel(1);
+    
     engineRef.current?.startGame(startWave);
-  }, []);
+    
+    if (progressData) {
+      engineRef.current?.loadProgress(progressData);
+      setCollectedCards(progressData.collectedCards || []);
+      setScore(progressData.score || 0);
+      setLevel(progressData.level || 1);
+    }
+  }, [clearProgress]);
 
   const handleResume = useCallback(() => {
     engineRef.current?.resume();
@@ -104,7 +184,10 @@ export default function GameCanvas() {
     engine.selectCard(card);
     setCollectedCards(engine.getCollectedCards());
     setCardChoices([]);
-  }, []);
+    
+    // Save progress after picking a card too
+    saveProgress(engine.getSaveData());
+  }, [saveProgress]);
 
   const handleRestart = useCallback(() => {
     engineRef.current?.destroy();
@@ -117,7 +200,8 @@ export default function GameCanvas() {
     engineRef.current = engine;
     setCollectedCards([]);
     engine.startGame();
-  }, []);
+    clearProgress();
+  }, [clearProgress]);
 
   const handleQuitToMenu = useCallback(() => {
     engineRef.current?.destroy();
@@ -130,7 +214,8 @@ export default function GameCanvas() {
     engineRef.current = engine;
     setCollectedCards([]);
     setGameState(GameState.MENU);
-  }, []);
+    fetchProgress();
+  }, [fetchProgress]);
 
   return (
     <div id="game-container" className="game-container">
@@ -141,7 +226,7 @@ export default function GameCanvas() {
       />
 
       {gameState === GameState.MENU && (
-        <MainMenu onStartGame={handleStartGame} />
+        <LandingPage onStartGame={handleStartGame} savedProgress={savedProgress} />
       )}
 
       {(gameState === GameState.PLAYING ||

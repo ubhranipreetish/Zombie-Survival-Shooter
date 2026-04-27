@@ -135,6 +135,7 @@ export enum GameEvent {
   EXP_CHANGED = 'EXP_CHANGED',
   LEVEL_UP = 'LEVEL_UP',
   CRIT_HIT = 'CRIT_HIT',
+  HUD_READY = 'HUD_READY',
 }
 
 /**

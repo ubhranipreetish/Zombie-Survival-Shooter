@@ -22,7 +22,16 @@ const userSchema = new mongoose.Schema({
   },
   googleId: {
     type: String,
-    // Google ID is optional, only present for users who sign in via Google
+  },
+  gameProgress: {
+    wave: { type: Number, default: 1 },
+    level: { type: Number, default: 1 },
+    xp: { type: Number, default: 0 },
+    score: { type: Number, default: 0 },
+    collectedCards: { type: Array, default: [] },
+    ammo: { type: Object, default: {} },
+    stats: { type: Object, default: {} },
+    hasProgress: { type: Boolean, default: false },
   },
 }, { timestamps: true });
 

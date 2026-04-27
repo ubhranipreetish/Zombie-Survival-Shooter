@@ -82,6 +82,18 @@ export class AbilitySystem {
     };
   }
 
+  emitUpdate(): void {
+    if (this.currentAbility === AbilityType.NONE) return;
+    EventBus.getInstance().emit(GameEvent.ABILITY_COOLDOWN, {
+      ability: this.currentAbility,
+      cooldownRemaining: this.cooldownTimer,
+      cooldownTotal: this.cooldownDuration,
+      isActive: this.isAbilityActive,
+      activeRemaining: this.activeTimer,
+      level: this.abilityLevel,
+    });
+  }
+
   update(deltaTime: number): void {
     if (this.cooldownTimer > 0) {
       this.cooldownTimer = Math.max(0, this.cooldownTimer - deltaTime);

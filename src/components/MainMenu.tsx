@@ -3,7 +3,8 @@
 // MainMenu.tsx — Title screen with premium dark UI
 // ============================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface MainMenuProps {
   onStartGame: (startWave: number) => void;
@@ -12,8 +13,41 @@ interface MainMenuProps {
 export default function MainMenu({ onStartGame }: MainMenuProps) {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [startWave, setStartWave] = useState(1);
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (e) {
+        console.error('Failed to parse user data', e);
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    router.push('/login');
+  };
+
   return (
     <div id="main-menu" className="menu-overlay">
+      {/* Profile Section */}
+      {user && (
+        <div className="menu-profile-container">
+          <div className="menu-profile-info">
+            <span className="menu-profile-name">{user.name}</span>
+            <button className="menu-logout-btn" onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
+          <div className="menu-profile-avatar">
+            {user.name.charAt(0).toUpperCase()}
+          </div>
+        </div>
+      )}
       <div className="menu-content">
         {/* Title */}
         <div className="menu-title-container">

@@ -52,6 +52,18 @@ export class ExpSystem {
     return false;
   }
 
+  loadProgress(level: number, exp: number): void {
+    this.level = level;
+    this.exp = exp;
+    this.pendingLevelUps = 0;
+    
+    EventBus.getInstance().emit(GameEvent.EXP_CHANGED, {
+      exp: this.exp,
+      expToNext: this.getExpForLevel(this.level),
+      level: this.level,
+    });
+  }
+
   reset(): void {
     this.exp = 0;
     this.level = 1;

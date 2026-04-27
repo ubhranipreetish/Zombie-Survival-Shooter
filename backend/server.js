@@ -9,6 +9,7 @@ require('dotenv').config();
 require('./config/passport');
 
 const authRoutes = require('./routes/auth');
+const gameRoutes = require('./routes/game');
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/game', gameRoutes);
 
 // Database Connection
 const PORT = process.env.PORT || 5001;

@@ -459,6 +459,10 @@ export class CardSystem {
   /**
    * Reset for new game.
    */
+  loadProgress(cards: PowerUpCard[]): void {
+    this.collectedCards = [...cards];
+  }
+
   reset(): void {
     this.collectedCards = [];
   }

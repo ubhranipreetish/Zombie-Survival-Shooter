@@ -54,12 +54,12 @@ export class GameEngine {
   private animationFrameId: number | null;
 
   private player!: Player;
-  private enemies: Enemy[];
-  private bullets: Bullet[];
-  private enemyBullets: EnemyBullet[];
-  private powerUps: PowerUp[];
-  private expOrbs: ExpOrb[];
-  private grenades: Grenade[];
+  private enemies: Enemy[] = [];
+  private bullets: Bullet[] = [];
+  private enemyBullets: EnemyBullet[] = [];
+  private powerUps: PowerUp[] = [];
+  private expOrbs: ExpOrb[] = [];
+  private grenades: Grenade[] = [];
 
   private baseWeapons: Weapons[];
   private flamethrower: Flamethrower;
@@ -95,12 +95,6 @@ export class GameEngine {
     this.lastFrameTime = 0;
     this.animationFrameId = null;
 
-    this.enemies = [];
-    this.bullets = [];
-    this.enemyBullets = [];
-    this.powerUps = [];
-    this.expOrbs = [];
-    this.grenades = [];
 
     this.baseWeapons = [new Pistol(), new Shotgun(), new Rifle()];
     this.flamethrower = new Flamethrower();
@@ -183,6 +177,10 @@ export class GameEngine {
     this.unsubscribers.push(this.eventBus.subscribe(GameEvent.WAVE_CHANGED, () => {
     }));
 
+    this.unsubscribers.push(this.eventBus.subscribe(GameEvent.HUD_READY, () => {
+      this.emitAllState();
+    }));
+
     // Enemies shooting (e.g. ShooterZombie)
     this.unsubscribers.push(this.eventBus.subscribe(GameEvent.ENEMY_SHOOT, (data: unknown) => {
       AudioSystem.getInstance().playEnemyShoot();
@@ -260,6 +258,68 @@ export class GameEngine {
 
   getCollectedCards(): PowerUpCard[] {
     return this.cardSystem.getCollectedCards();
+  }
+
+  getSaveData(): any {
+    return {
+      wave: this.waveManager.getCurrentWave(),
+      level: this.expSystem.getLevel(),
+      xp: this.expSystem.getExp(),
+      score: this.score,
+      totalKills: this.totalKills,
+      collectedCards: this.cardSystem.getCollectedCards(),
+      ammo: this.player?.getAmmoData() || {},
+      stats: this.player?.getStats() || {},
+    };
+  }
+
+  emitAllState(): void {
+    if (!this.player) return;
+
+    this.eventBus.emit(GameEvent.SCORE_CHANGED, { score: this.score, kills: this.totalKills });
+    this.eventBus.emit(GameEvent.WAVE_CHANGED, { wave: this.waveManager.getCurrentWave() });
+    this.eventBus.emit(GameEvent.PLAYER_HEALTH_CHANGED, {
+      health: this.player.getHealth(),
+      maxHealth: this.player.getMaxHealth(),
+    });
+    this.eventBus.emit(GameEvent.WEAPON_CHANGED, {
+      name: this.player.getWeapon().name,
+      color: this.player.getWeapon().color,
+    });
+    this.eventBus.emit(GameEvent.AMMO_CHANGED, {
+      ammo: this.player.getAmmo(),
+      maxAmmo: this.player.getWeapon().maxAmmo,
+      weaponName: this.player.getWeapon().name,
+    });
+    this.eventBus.emit(GameEvent.PLAYER_STATS_CHANGED, this.player.getStats());
+    this.eventBus.emit(GameEvent.EXP_CHANGED, {
+      exp: this.expSystem.getExp(),
+      expToNext: this.expSystem.getExpToNext(),
+      level: this.expSystem.getLevel(),
+    });
+    this.abilitySystem.emitUpdate();
+  }
+
+  loadProgress(data: any): void {
+    if (!data) return;
+    
+    // The engine MUST be initialized first via startGame or similar, 
+    // but loadProgress is usually called RIGHT AFTER startGame(startWave).
+    
+    if (data.score !== undefined) this.score = data.score;
+    if (data.totalKills !== undefined) this.totalKills = data.totalKills;
+    if (data.level !== undefined && data.xp !== undefined) {
+      this.expSystem.loadProgress(data.level, data.xp);
+    }
+    if (data.collectedCards) {
+      this.cardSystem.loadProgress(data.collectedCards);
+    }
+    if (this.player && (data.stats || data.ammo)) {
+      this.player.loadProgress(data.stats, data.ammo);
+    }
+    
+    // Emit initial events for HUD
+    this.emitAllState();
   }
 
   startGame(startWave: number = 1): void {
