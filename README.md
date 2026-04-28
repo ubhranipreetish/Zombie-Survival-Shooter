@@ -4,7 +4,7 @@ A wave-based 2D browser survival game built with Next.js, React, and TypeScript,
 
 Live: https://zombie-survival-shooter.vercel.app  
 Repository: https://github.com/ubhranipreetish/Zombie-Survival-Shooter
-
+Report: https://docs.google.com/document/d/1_PQ2Wyk3EHsNt_vwN3FSNbhy0mxrPrbi9fhJy_KdyZg/edit?usp=sharing
 ---
 
 ## Tech Stack
@@ -136,4 +136,4 @@ UML diagrams covering the class hierarchy, use cases, sequence flows, and entity
 | Preetish Ubhrani | Project Lead and Game Architect 
 | Aditya Bhardwaj | Game Systems Developer 
 | Kshitiz Surana | Frontend Developer 
-| Pushkar Jain | Systems Developer 
+| Pushkar Jain | Systems Developer
